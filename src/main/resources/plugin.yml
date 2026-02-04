@@ -1,0 +1,29 @@
+name: EchoMarket
+version: '${version}'
+main: com.github.cinnaio.echomarket.EchoMarket
+api-version: '1.21'
+load: STARTUP
+authors: [ Cinnaio ]
+folia-supported: true
+depend:
+  - Vault
+  - FancyNpcs
+softdepend: []
+commands:
+  market:
+    description: 市场主命令
+    usage: /market
+    aliases: [m]
+permissions:
+  market.admin:
+    description: 管理员权限
+    default: op
+  market.shops.limit.unlimited:
+    description: 允许创建无限个商店
+    default: op
+  market.list:
+    description: 允许列出自己的商店
+    default: true
+  market.remove:
+    description: 允许删除自己的商店
+    default: true

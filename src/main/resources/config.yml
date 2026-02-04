@@ -1,0 +1,40 @@
+database:
+  # sqlite or mysql
+  type: sqlite
+  # for mysql
+  host: localhost
+  port: 3306
+  database: echomarket
+  username: root
+  password: password
+
+market:
+  # NPC 可视距离（格）
+  npc-view-distance: 32
+  # 交易距离限制（格）
+  distance-limit: 4
+  # 下架服务费类型：fixed (固定金额) 或 percent (百分比)
+  fee-type: percent
+  # 下架服务费数值
+  # 百分比：3 表示 3%
+  # 固定金额：10.0 表示 10 元
+  fee-value: 3
+  
+  # 成交服务费 (百分比)
+  # 卖家出售物品时扣除的手续费
+  transaction-fee: 3.0
+  
+  # 黑名单物品 Hash 列表
+  blacklist: []
+  
+  # 特殊物品手续费 (Hash: Rate)
+  # 百分比数值，例如 5.0 表示 5%
+  special-fees: {}
+
+board:
+  # 留言展示时长（秒）
+  duration-seconds: 86400
+  # 续费价格
+  renew-price: 100.0
+  # 续费增加时长（秒）
+  renew-duration-seconds: 86400
