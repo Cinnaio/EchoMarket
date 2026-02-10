@@ -41,7 +41,7 @@ class EchoMarket : JavaPlugin() {
         
         // Setup Economy
         if (!setupEconomy()) {
-            logger.severe(String.format("[%s] - Disabled due to no Vault dependency found!", description.name))
+            logger.severe(String.format("[%s] - Disabled due to no Vault dependency found!", name))
             server.pluginManager.disablePlugin(this)
             return
         }

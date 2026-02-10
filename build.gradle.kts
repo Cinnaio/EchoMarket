@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.github.cinnaio"
-version = "1.5.8"
+version = "1.6.8"
 
 repositories {
     mavenCentral()

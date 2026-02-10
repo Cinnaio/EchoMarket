@@ -1,8 +1,8 @@
 package com.github.cinnaio.echomarket.command
 
 import com.github.cinnaio.echomarket.EchoMarket
-import com.github.cinnaio.echomarket.util.MessageUtil
 import com.github.cinnaio.echomarket.util.ItemUtil
+import com.github.cinnaio.echomarket.util.MessageUtil
 import org.bukkit.command.Command
 import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
@@ -45,9 +45,16 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
                     MessageUtil.send(sender, "<market.no-shop>")
                     return true
                 }
-                MessageUtil.send(sender, "<color:#FFD479>=== 你的商店列表 (${shops.size}) ===")
+                MessageUtil.send(sender, "<command.list.header>", mapOf("count" to shops.size.toString()))
                 shops.forEach { shop ->
-                    MessageUtil.send(sender, "<color:#A0A0A0>ID: <color:#E6E6E6>${shop.id} <color:#A0A0A0>| 名称: <color:#E6E6E6>${shop.name} <color:#A0A0A0>| 位置: <color:#E6E6E6>${shop.location.blockX},${shop.location.blockY},${shop.location.blockZ} (${shop.location.world.name})")
+                    MessageUtil.send(sender, "<command.list.entry>", mapOf(
+                        "id" to shop.id.toString(),
+                        "name" to shop.name,
+                        "x" to shop.location.blockX.toString(),
+                        "y" to shop.location.blockY.toString(),
+                        "z" to shop.location.blockZ.toString(),
+                        "world" to shop.location.world.name
+                    ))
                 }
             }
             "remove" -> {
@@ -55,7 +62,7 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
                 if (args.size > 1) {
                     val id = args[1].toIntOrNull()
                     if (id == null) {
-                        MessageUtil.send(sender, "<color:#FF6B6B>无效的商店 ID。")
+                        MessageUtil.send(sender, "<command.remove.invalid-id>")
                         return true
                     }
                     plugin.marketManager.removeShop(sender, id)
@@ -72,16 +79,16 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
                         if (shops.any { it.id == shopId }) {
                             plugin.marketManager.removeShop(sender, shopId)
                         } else {
-                            MessageUtil.send(sender, "<color:#FF6B6B>这不属于你的商店。")
+                            MessageUtil.send(sender, "<market.not-your-shop>")
                         }
                         return true
                     }
                 }
-                MessageUtil.send(sender, "<color:#FF6B6B>请看着你的商店 NPC 输入此命令，或指定商店 ID: /market remove <ID>")
+                MessageUtil.send(sender, "<command.remove.usage>")
             }
             "name" -> {
                 if (args.size < 2) {
-                    MessageUtil.send(sender, "<color:#FF6B6B>用法: /market name <名称>")
+                    MessageUtil.send(sender, "<command.name.usage>")
                     return true
                 }
                 val name = args.drop(1).joinToString(" ")
@@ -89,7 +96,7 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
             }
             "desc" -> {
                 if (args.size < 2) {
-                    MessageUtil.send(sender, "<color:#FF6B6B>用法: /market desc <介绍>")
+                    MessageUtil.send(sender, "<command.desc.usage>")
                     return true
                 }
                 val desc = args.drop(1).joinToString(" ")
@@ -97,7 +104,7 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
             }
             "skin" -> {
                 if (args.size < 2) {
-                     MessageUtil.send(sender, "<color:#FF6B6B>用法: /market skin <玩家名>")
+                     MessageUtil.send(sender, "<command.skin.usage>")
                      return true
                 }
                 val skinName = args[1]
@@ -105,7 +112,7 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
             }
             "sell" -> {
                 if (args.size < 2) {
-                    MessageUtil.send(sender, "<color:#FF6B6B>用法: /market sell <价格>")
+                    MessageUtil.send(sender, "<command.sell.usage>")
                     return true
                 }
                 val price = args[1].toDoubleOrNull()
@@ -116,7 +123,7 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
                 
                 val item = sender.inventory.itemInMainHand
                 if (item.type.isAir) {
-                    MessageUtil.send(sender, "<red>请手持要出售的物品。")
+                    MessageUtil.send(sender, "<command.sell.no-item>")
                     return true
                 }
                 
@@ -125,7 +132,7 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
                 if (shop == null) {
                     val shops = plugin.storage.getShops(sender.uniqueId)
                     if (shops.size > 1) {
-                        MessageUtil.send(sender, "<red>你有多个商店，请看着你要上架的商店 NPC。")
+                        MessageUtil.send(sender, "<market.multiple-shops-target>")
                     } else {
                         MessageUtil.send(sender, "<market.no-shop>")
                     }
@@ -141,8 +148,9 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
                 
                 // 检查黑名单
                 val hash = ItemUtil.calculateHash(item)
-                if (plugin.config.getStringList("market.blacklist").contains(hash)) {
-                    MessageUtil.send(sender, "<red>此物品已被禁止上架。")
+                val blacklist = plugin.config.getStringList("market.blacklist")
+                if (blacklist.any { it.startsWith(hash) }) {
+                    MessageUtil.send(sender, "<market.blacklisted>")
                     return true
                 }
 
@@ -160,10 +168,15 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
                 }
                 val expectedIncome = (price * item.amount) * (1 - feeRate)
                 
+                // 获取物品名称（在删除物品前获取，防止引用失效）
+                val itemName = ItemUtil.getDisplayName(item)
+                
                 sender.inventory.setItemInMainHand(null)
-                MessageUtil.send(sender, "<market.seller-sold-notification>", mapOf(
+                
+                MessageUtil.send(sender, "<command.sell.success>", mapOf(
                     "amount" to item.amount.toString(),
-                    "price" to String.format("%.2f", expectedIncome)
+                    "price" to String.format("%.2f", expectedIncome),
+                    "item" to itemName
                 ))
             }
             "admin" -> {
@@ -196,40 +209,86 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
                         
                         // Default list command (all shops)
                         val shops = plugin.storage.getAllShops()
-                        sender.sendMessage("§e=== 商店列表 (${shops.size}) ===")
+                        MessageUtil.send(sender, "<command.admin.list.header>", mapOf("count" to shops.size.toString()))
                         shops.forEach { shop ->
-                            sender.sendMessage("§7ID: ${shop.id} | Owner: ${shop.ownerName} | Name: ${shop.name}")
+                            MessageUtil.send(sender, "<command.admin.list.entry>", mapOf(
+                                "id" to shop.id.toString(),
+                                "owner" to shop.ownerName,
+                                "name" to shop.name
+                            ))
                         }
                     }
                     "ban" -> {
                         // /market admin ban <item> (hand)
                         val item = sender.inventory.itemInMainHand
                         if (item.type.isAir) {
-                            MessageUtil.send(sender, "<red>请手持要封禁的物品。")
+                            MessageUtil.send(sender, "<command.admin.ban.no-item>")
                             return true
                         }
                         val hash = ItemUtil.calculateHash(item)
                         val blacklist = plugin.config.getStringList("market.blacklist").toMutableList()
-                        if (blacklist.contains(hash)) {
-                            blacklist.remove(hash)
-                            MessageUtil.send(sender, "<green>物品已解封。")
+                        val existingEntry = blacklist.find { it.startsWith(hash) }
+                        
+                        if (existingEntry != null) {
+                            blacklist.remove(existingEntry)
+                            MessageUtil.send(sender, "<command.admin.ban.unbanned>")
                         } else {
-                            blacklist.add(hash)
-                            MessageUtil.send(sender, "<red>物品已封禁。")
+                            // 为了在 GUI 中显示正确的材质，我们存储 "Hash|Base64"
+                            // 归一化数量为 1 再序列化，用于展示
+                            val displayItem = item.clone()
+                            displayItem.amount = 1
+                            val serialized = ItemUtil.serializeItemStack(displayItem)
+                            blacklist.add("$hash|$serialized")
+                            MessageUtil.send(sender, "<command.admin.ban.banned>")
                         }
                         plugin.config.set("market.blacklist", blacklist)
                         plugin.saveConfig()
                     }
                     "fee" -> {
-                         // /market admin fee <item> (hand)
+                         // /market admin fee [rate]
+                         // If rate is provided, set fee. If not, just show hash/info.
                          val item = sender.inventory.itemInMainHand
                          if (item.type.isAir) {
-                            MessageUtil.send(sender, "<red>请手持物品。")
+                            MessageUtil.send(sender, "<command.admin.fee.no-item>")
                             return true
                         }
                         val hash = ItemUtil.calculateHash(item)
-                        MessageUtil.send(sender, "<green>物品 Hash: <gold>$hash")
-                        MessageUtil.send(sender, "<gray>请在 config.yml 中配置此 Hash 的特殊费率 (暂未实现自动配置)。")
+                        
+                        if (args.size >= 3) {
+                            val rateStr = args[2]
+                            val rate = rateStr.toDoubleOrNull()
+                            if (rate == null) {
+                                MessageUtil.send(sender, "<command.invalid-number>")
+                                return true
+                            }
+                            
+                            // Save rate
+                            plugin.config.set("market.special-fees.$hash", rate)
+                            
+                            // Save item display data
+                            val displayItem = item.clone()
+                            displayItem.amount = 1
+                            val serialized = ItemUtil.serializeItemStack(displayItem)
+                            plugin.config.set("market.special-fees-data.$hash", serialized)
+                            
+                            plugin.saveConfig()
+                            MessageUtil.send(sender, "<command.admin.fee.set>", mapOf(
+                                "rate" to rate.toString(),
+                                "item" to ItemUtil.getDisplayName(item)
+                            ))
+                        } else {
+                            // View only
+                            val currentRate = plugin.config.getDouble("market.special-fees.$hash", -1.0)
+                            if (currentRate >= 0) {
+                                MessageUtil.send(sender, "<command.admin.fee.current>", mapOf(
+                                    "rate" to currentRate.toString(),
+                                    "hash" to hash
+                                ))
+                            } else {
+                                MessageUtil.send(sender, "<command.admin.fee.hash>", mapOf("hash" to hash))
+                                MessageUtil.send(sender, "<command.admin.fee.hint>")
+                            }
+                        }
                     }
                     else -> sendAdminHelp(sender)
                 }
@@ -284,13 +343,14 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
     }
     
     private fun sendAdminHelp(sender: CommandSender) {
-        sender.sendMessage("§c/market admin reload - 重载配置")
-        sender.sendMessage("§c/market admin list - 列出商店")
-        sender.sendMessage("§c/market admin ban - 封禁/解封手持物品")
-        sender.sendMessage("§c/market admin fee - 查看手持物品 Hash")
+        MessageUtil.send(sender, "<command.admin.help.reload>", emptyMap(), false)
+        MessageUtil.send(sender, "<command.admin.help.list>", emptyMap(), false)
+        MessageUtil.send(sender, "<command.admin.help.ban>", emptyMap(), false)
+        MessageUtil.send(sender, "<command.admin.help.fee>", emptyMap(), false)
     }
 
     private fun sendHelp(sender: CommandSender) {
+        @Suppress("DEPRECATION")
         val version = plugin.description.version
         MessageUtil.send(sender, "<help.title>", mapOf("version" to version), false)
         

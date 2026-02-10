@@ -221,7 +221,7 @@ class GuiManager(private val plugin: EchoMarket) : Listener {
     
     fun openAdminBanList(player: Player, page: Int = 1) {
         val blacklist = plugin.config.getStringList("market.blacklist")
-        val inv = Bukkit.createInventory(AdminBanListHolder(page), 54, MessageUtil.get("gui-admin-ban-title", mapOf("page" to page.toString())))
+        val inv = Bukkit.createInventory(AdminBanListHolder(page), 54, MessageUtil.get("gui.admin-ban-title", mapOf("page" to page.toString())))
         fillBorders(inv)
         inv.setItem(49, backButton)
         
@@ -229,14 +229,31 @@ class GuiManager(private val plugin: EchoMarket) : Listener {
         val endIndex = Math.min(startIndex + 36, blacklist.size)
         
         for (i in startIndex until endIndex) {
-            val hash = blacklist[i]
-            val item = ItemStack(Material.BARRIER)
+            val entry = blacklist[i]
+            val parts = entry.split("|")
+            val hash = parts[0]
+            
+            var item: ItemStack
+            if (parts.size > 1) {
+                // 有存储 Base64 数据，还原物品
+                try {
+                    item = ItemUtil.deserializeItemStack(parts[1])
+                } catch (e: Exception) {
+                    item = ItemStack(Material.BARRIER)
+                }
+            } else {
+                // 旧数据，只有 Hash
+                item = ItemStack(Material.BARRIER)
+            }
+            
             val meta = item.itemMeta
-            meta.displayName(MessageUtil.get("gui-admin-ban-hash", mapOf("hash" to hash.take(8))))
-            meta.lore(listOf(
-                MessageUtil.get("gui-admin-ban-type-hash"),
-                MessageUtil.get("gui-admin-ban-hash", mapOf("hash" to hash))
-            ))
+            // 保留物品原名，并在 Lore 中添加 Hash 信息
+            val lore = meta.lore() ?: mutableListOf()
+            lore.add(Component.empty())
+            lore.add(MessageUtil.get("gui.admin-ban-type-hash"))
+            lore.add(MessageUtil.get("gui.admin-ban-hash", mapOf("hash" to hash)))
+            meta.lore(lore)
+            
             // Store hash for removal
             meta.persistentDataContainer.set(itemHashKey, PersistentDataType.STRING, hash)
             item.itemMeta = meta
@@ -266,7 +283,7 @@ class GuiManager(private val plugin: EchoMarket) : Listener {
         val specialFees = plugin.config.getConfigurationSection("market.special-fees")
         val keys = specialFees?.getKeys(false)?.toList() ?: emptyList()
         
-        val inv = Bukkit.createInventory(AdminFeeListHolder(page), 54, MessageUtil.get("gui-admin-fee-title", mapOf("page" to page.toString())))
+        val inv = Bukkit.createInventory(AdminFeeListHolder(page), 54, MessageUtil.get("gui.admin-fee-title", mapOf("page" to page.toString())))
         fillBorders(inv)
         inv.setItem(49, backButton)
         
@@ -276,12 +293,31 @@ class GuiManager(private val plugin: EchoMarket) : Listener {
         for (i in startIndex until endIndex) {
             val hash = keys[i]
             val rate = specialFees!!.getDouble(hash)
-            val item = ItemStack(Material.GOLD_INGOT)
+            
+            // Try to load item from special-fees-data
+            val serialized = plugin.config.getString("market.special-fees-data.$hash")
+            var item: ItemStack
+            if (serialized != null) {
+                try {
+                    item = ItemUtil.deserializeItemStack(serialized)
+                } catch (e: Exception) {
+                    item = ItemStack(Material.GOLD_INGOT)
+                }
+            } else {
+                item = ItemStack(Material.GOLD_INGOT)
+            }
+            
             val meta = item.itemMeta
-            meta.displayName(MessageUtil.get("gui-admin-fee-rate", mapOf("rate" to rate.toString())))
-            meta.lore(listOf(
-                MessageUtil.get("gui-admin-fee-hash", mapOf("hash" to hash))
-            ))
+            val itemName = if (serialized != null) ItemUtil.getDisplayName(item) else MessageUtil.get("gui.admin-fee-rate", mapOf("rate" to rate.toString())) // Fallback name
+            
+            // If it's a real item, we append the rate to the lore or display name
+            // Let's keep the item name and add rate info in lore
+            val lore = meta.lore() ?: mutableListOf()
+            lore.add(Component.empty())
+            lore.add(MessageUtil.get("gui.admin-fee-rate-lore", mapOf("rate" to rate.toString())))
+            lore.add(MessageUtil.get("gui.admin-fee-hash", mapOf("hash" to hash)))
+            meta.lore(lore)
+            
             item.itemMeta = meta
             inv.addItem(item)
         }
@@ -346,16 +382,16 @@ class GuiManager(private val plugin: EchoMarket) : Listener {
     }
 
     private fun formatDuration(seconds: Long): String {
-        if (seconds <= 0) return "已过期"
+        if (seconds <= 0) return plugin.configManager.getMessage("time.expired")
         val days = seconds / 86400
         val hours = (seconds % 86400) / 3600
         val minutes = (seconds % 3600) / 60
         
         val sb = StringBuilder()
-        if (days > 0) sb.append("${days}天")
-        if (hours > 0) sb.append("${hours}小时")
-        if (minutes > 0) sb.append("${minutes}分")
-        if (sb.isEmpty()) sb.append("${seconds}秒")
+        if (days > 0) sb.append("$days${plugin.configManager.getMessage("time.days")}")
+        if (hours > 0) sb.append("$hours${plugin.configManager.getMessage("time.hours")}")
+        if (minutes > 0) sb.append("$minutes${plugin.configManager.getMessage("time.minutes")}")
+        if (sb.isEmpty()) sb.append("$seconds${plugin.configManager.getMessage("time.seconds")}")
         
         return sb.toString()
     }
@@ -391,8 +427,12 @@ class GuiManager(private val plugin: EchoMarket) : Listener {
             if (item.hasItemMeta() && item.itemMeta.persistentDataContainer.has(itemHashKey, PersistentDataType.STRING)) {
                 val hash = item.itemMeta.persistentDataContainer.get(itemHashKey, PersistentDataType.STRING)!!
                 
-                if (event.isRightClick && holder.shop.ownerUuid == player.uniqueId) {
-                    plugin.marketManager.removeItem(player, hash)
+                if (holder.shop.ownerUuid == player.uniqueId) {
+                    if (event.isRightClick) {
+                        plugin.marketManager.removeItem(player, hash)
+                    } else {
+                        MessageUtil.send(player, "<market.cannot-buy-own-action>")
+                    }
                 } else {
                     // Open Confirmation GUI instead of direct buy
                     // Need to find stock and min price
@@ -413,10 +453,19 @@ class GuiManager(private val plugin: EchoMarket) : Listener {
             
             if (item.type == Material.WRITABLE_BOOK) {
                 player.closeInventory()
-                MessageUtil.send(player, "<color:#6BFF95>请在聊天栏输入留言内容：")
+                MessageUtil.send(player, "<board.enter-message>")
                 // 这里需要一个简单的聊天监听器或者 Conversation API
                 // 为了简单，我们注册一个临时的 ChatListener
-                plugin.server.pluginManager.registerEvents(ChatInputListener(plugin, player.uniqueId), plugin)
+                val listener = ChatInputListener(plugin, player.uniqueId)
+                plugin.server.pluginManager.registerEvents(listener, plugin)
+                
+                // Add timeout (60 seconds)
+                player.scheduler.runDelayed(plugin, { task ->
+                    if (listener.isActive) {
+                        listener.unregister()
+                        MessageUtil.send(player, "<board.timeout>")
+                    }
+                }, null, 1200L) // 60 * 20 ticks
             } else if (item.hasItemMeta() && item.itemMeta.persistentDataContainer.has(boardIdKey, PersistentDataType.INTEGER)) {
                 val boardId = item.itemMeta.persistentDataContainer.get(boardIdKey, PersistentDataType.INTEGER)!!
                 plugin.boardManager.renewMessage(player, boardId)
@@ -467,9 +516,23 @@ class GuiManager(private val plugin: EchoMarket) : Listener {
                 } else if (event.slot == 53) {
                     openAdminBanList(player, holder.page + 1)
                 }
-            } else if (item.type == Material.BARRIER) {
-                // Click to remove? Maybe left click to copy hash?
-                // For now just view.
+            } else {
+                 // Check if it's a valid item with hash
+                 if (item.hasItemMeta() && item.itemMeta.persistentDataContainer.has(itemHashKey, PersistentDataType.STRING)) {
+                     // Click to remove from blacklist
+                     val hash = item.itemMeta.persistentDataContainer.get(itemHashKey, PersistentDataType.STRING)
+                     if (hash != null) {
+                         val blacklist = plugin.config.getStringList("market.blacklist").toMutableList()
+                         val entry = blacklist.find { it.startsWith(hash) }
+                         if (entry != null) {
+                             blacklist.remove(entry)
+                             plugin.config.set("market.blacklist", blacklist)
+                             plugin.saveConfig()
+                             MessageUtil.send(player, "<command.admin.ban.unbanned>")
+                             openAdminBanList(player, holder.page) // Refresh
+                         }
+                     }
+                 }
             }
         } else if (holder is AdminFeeListHolder) {
             if (item == backButton) {
@@ -487,6 +550,11 @@ class GuiManager(private val plugin: EchoMarket) : Listener {
     }
     
     private fun handleBuy(player: Player, shop: ShopData, itemHash: String, amount: Int) {
+        if (shop.ownerUuid == player.uniqueId) {
+            MessageUtil.send(player, "<market.cannot-buy-own>")
+            return
+        }
+        
         // 1. 查找该 Hash 的所有库存
         val items = plugin.storage.getItems(shop.id).filter { it.itemHash == itemHash }.sortedBy { it.price }
         
@@ -574,8 +642,27 @@ class GuiManager(private val plugin: EchoMarket) : Listener {
         }
         
         // MessageUtil.send(player, "<market.item-bought>", mapOf("price" to totalPrice.toString()))
-        MessageUtil.send(player, "<market.buy-bought-chat>", mapOf("amount" to amount.toString()))
+        val mm = net.kyori.adventure.text.minimessage.MiniMessage.miniMessage()
+        val templateItem = items.first().itemStack
+        
+        // 优化物品名称显示：如果有 DisplayName 则使用，否则使用翻译键
+        val itemName = ItemUtil.getDisplayName(templateItem)
+
+        MessageUtil.send(player, "<market.buy-bought-chat>", mapOf(
+            "amount" to amount.toString(), 
+            "item" to itemName
+        ))
         MessageUtil.send(player, "<market.buy-cost-chat>", mapOf("cost" to totalPrice.toString()))
+        
+        // 通知卖家
+        val seller = Bukkit.getPlayer(shop.ownerUuid)
+        if (seller != null && seller.isOnline) {
+             MessageUtil.send(seller, "<market.seller-sold-notification>", mapOf(
+                 "amount" to amount.toString(),
+                 "item" to itemName,
+                 "price" to sellerIncome.toString()
+             ))
+        }
         
         if (anyDropped) {
             MessageUtil.send(player, "<market.buy-inventory-full>")
@@ -588,17 +675,37 @@ class GuiManager(private val plugin: EchoMarket) : Listener {
 
 // Helper class for chat input
 class ChatInputListener(private val plugin: EchoMarket, private val playerUuid: UUID) : Listener {
+    
+    var isActive = true
+        private set
+
+    fun unregister() {
+        if (!isActive) return
+        isActive = false
+        org.bukkit.event.HandlerList.unregisterAll(this)
+    }
+
+    @Suppress("DEPRECATION")
     @EventHandler(priority = org.bukkit.event.EventPriority.LOWEST)
     fun onChat(event: org.bukkit.event.player.AsyncPlayerChatEvent) {
+        if (!isActive) return
         if (event.player.uniqueId == playerUuid) {
             event.isCancelled = true
             val content = event.message
+            unregister() // Unregister immediately
+            
             // Switch to main thread to modify world/gui
             // Use Folia-compatible scheduler
             event.player.scheduler.run(plugin, { _ ->
                 plugin.boardManager.postMessage(event.player, content)
             }, null)
-            org.bukkit.event.HandlerList.unregisterAll(this)
+        }
+    }
+
+    @EventHandler
+    fun onQuit(event: org.bukkit.event.player.PlayerQuitEvent) {
+        if (event.player.uniqueId == playerUuid) {
+            unregister()
         }
     }
 }

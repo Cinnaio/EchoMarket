@@ -33,8 +33,8 @@ class MarketManager(private val plugin: EchoMarket) {
         // 调整朝向面向玩家
         loc.yaw = player.location.yaw + 180
         
-        val shopName = name ?: "${player.name}的商店"
-        val shopDesc = desc ?: "欢迎光临！"
+        val shopName = name ?: plugin.configManager.getMessage("market.default-shop-name").replace("{player}", player.name)
+        val shopDesc = desc ?: plugin.configManager.getMessage("market.default-shop-desc")
         
         if (plugin.storage.createShop(player.uniqueId, player.name, loc, shopName, shopDesc)) {
             // Find the newly created shop (likely the last one or by name/loc)
@@ -50,10 +50,10 @@ class MarketManager(private val plugin: EchoMarket) {
                 plugin.npcManager.spawnNpc(loc, shopName, player.uniqueId, shop.id)
                 MessageUtil.send(player, "<market.created>", mapOf("name" to shopName))
             } else {
-                 MessageUtil.send(player, "<red>创建成功但在加载时出错。")
+                 MessageUtil.send(player, "<market.create-error-loading>")
             }
         } else {
-            MessageUtil.send(player, "<red>数据库错误，创建失败。")
+            MessageUtil.send(player, "<market.create-error-db>")
         }
     }
     
@@ -62,7 +62,7 @@ class MarketManager(private val plugin: EchoMarket) {
         val shop = shops.find { it.id == shopId }
         
         if (shop == null) {
-            MessageUtil.send(player, "<red>你没有 ID 为 $shopId 的商店。")
+            MessageUtil.send(player, "<market.no-shop-id>", mapOf("id" to shopId.toString()))
             return
         }
         
@@ -70,9 +70,9 @@ class MarketManager(private val plugin: EchoMarket) {
         if (plugin.storage.removeShop(shopId)) {
             // Remove NPC
             plugin.npcManager.removeNpc(shopId)
-            MessageUtil.send(player, "<green>商店已删除。")
+            MessageUtil.send(player, "<market.shop-removed>")
         } else {
-            MessageUtil.send(player, "<red>删除失败。")
+            MessageUtil.send(player, "<market.remove-failed>")
         }
     }
     
@@ -138,7 +138,7 @@ class MarketManager(private val plugin: EchoMarket) {
         if (shop == null) {
             val shops = plugin.storage.getShops(player.uniqueId)
             if (shops.size > 1) {
-                MessageUtil.send(player, "<red>你有多个商店，请看着你要修改的商店 NPC。")
+                MessageUtil.send(player, "<market.multiple-shops-target>")
             } else {
                 MessageUtil.send(player, "<market.no-shop>")
             }
@@ -154,7 +154,7 @@ class MarketManager(private val plugin: EchoMarket) {
         if (shop == null) {
             val shops = plugin.storage.getShops(player.uniqueId)
             if (shops.size > 1) {
-                MessageUtil.send(player, "<red>你有多个商店，请看着你要修改的商店 NPC。")
+                MessageUtil.send(player, "<market.multiple-shops-target>")
             } else {
                 MessageUtil.send(player, "<market.no-shop>")
             }

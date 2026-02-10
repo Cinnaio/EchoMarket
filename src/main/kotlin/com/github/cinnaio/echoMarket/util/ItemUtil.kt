@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.github.cinnaio.echomarket.util
 
 import org.bukkit.Material
@@ -13,17 +15,16 @@ object ItemUtil {
 
     fun calculateHash(item: ItemStack): String {
         // Hash 必须基于：物品材质（Material） + 物品的 原始 NBT 数据
-        // 由于 Spigot API 不直接暴露原始 NBT 字符串，我们使用 ItemStack 的序列化数据作为替代
-        // 这通常包含了 Material 和所有 Meta 数据 (NBT)
-        // 只要序列化后的字节数组不同，Hash 就不同
+        // 为了确保不同数量的同种物品（例如 1个石头 和 64个石头）拥有相同的 Hash，
+        // 我们在计算 Hash 前必须将数量归一化为 1。
+        val clone = item.clone()
+        clone.amount = 1
         
-        // 注意：ItemStack.serialize() 得到的 Map 可能不包含所有 NBT 细节，
-        // 更可靠的方法是使用 BukkitObjectOutputStream 序列化整个对象
-        
-        val serialized = serializeItemStack(item)
+        val serialized = serializeItemStack(clone)
         return sha256(serialized)
     }
     
+    @Suppress("DEPRECATION")
     fun serializeItemStack(item: ItemStack): String {
         val io = ByteArrayOutputStream()
         val os = BukkitObjectOutputStream(io)
@@ -32,6 +33,7 @@ object ItemUtil {
         return Base64.getEncoder().encodeToString(io.toByteArray())
     }
     
+    @Suppress("DEPRECATION")
     fun deserializeItemStack(data: String): ItemStack {
         val bytes = Base64.getDecoder().decode(data)
         val `in` = ByteArrayInputStream(bytes)
@@ -44,5 +46,33 @@ object ItemUtil {
         val md = MessageDigest.getInstance("SHA-256")
         val digest = md.digest(bytes)
         return digest.fold("") { str, it -> str + "%02x".format(it) }
+    }
+
+    fun getDisplayName(item: ItemStack): String {
+        val meta = item.itemMeta ?: return "<translate:${item.translationKey()}>"
+        val mm = net.kyori.adventure.text.minimessage.MiniMessage.miniMessage()
+        
+        // 1. Check Custom Name (DisplayName)
+        if (meta.hasDisplayName()) {
+            val displayName = meta.displayName()
+            if (displayName != null) {
+                return mm.serialize(displayName)
+            }
+        }
+        
+        // 2. Check Item Name (1.20.5+ feature)
+        // This is often used by custom items to set a non-italic default name
+        try {
+            if (meta.hasItemName()) {
+                val itemName = meta.itemName()
+                if (itemName != null) {
+                    return mm.serialize(itemName)
+                }
+            }
+        } catch (e: Throwable) {
+            // Ignore if running on older versions
+        }
+        
+        return "<translate:${item.translationKey()}>"
     }
 }

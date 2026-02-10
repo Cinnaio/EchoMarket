@@ -280,13 +280,7 @@ class StorageImpl(private val plugin: EchoMarket) : Storage {
             val ps = conn.prepareStatement("INSERT INTO items (shop_id, item_hash, item_data, price, stock, created_at) VALUES (?, ?, ?, ?, ?, ?)")
             ps.setInt(1, shopId)
             ps.setString(2, ItemUtil.calculateHash(item))
-            ps.setString(3, com.github.cinnaio.echomarket.util.ItemUtil.serializeItemStack(item)) // Accessing private via public util if I fix it
-            // Wait, serializeItemStack was private in ItemUtil. I need to make it public or use ItemUtil wrapper.
-            // I should modify ItemUtil to make serialize/deserialize public or use a wrapper method.
-            // For now I will assume I will fix ItemUtil.
-            // Let's use ItemUtil.serializeItemStack via reflection or change ItemUtil.
-            // Actually, I can just use ItemUtil.calculateHash for hash, but for data storage I need the serialized string.
-            // I'll update ItemUtil to make them public.
+            ps.setString(3, ItemUtil.serializeItemStack(item))
             ps.setDouble(4, price)
             ps.setInt(5, stock)
             ps.setLong(6, System.currentTimeMillis())
@@ -305,7 +299,7 @@ class StorageImpl(private val plugin: EchoMarket) : Storage {
                     rs.getInt("id"),
                     rs.getInt("shop_id"),
                     rs.getString("item_hash"),
-                    com.github.cinnaio.echomarket.util.ItemUtil.deserializeItemStack(rs.getString("item_data")),
+                    ItemUtil.deserializeItemStack(rs.getString("item_data")),
                     rs.getDouble("price"),
                     rs.getInt("stock")
                 ))
@@ -391,6 +385,35 @@ class StorageImpl(private val plugin: EchoMarket) : Storage {
             ps.setDouble(5, price)
             ps.setLong(6, System.currentTimeMillis())
             ps.executeUpdate()
+        }
+    }
+}
+
+/**
+ * Extension function to provide 'use' block for java.sql.Connection.
+ * Solves Unresolved reference and Type mismatch errors when AutoCloseable.use is not available.
+ */
+inline fun <R> Connection.use(block: (Connection) -> R): R {
+    var exception: Throwable? = null
+    try {
+        return block(this)
+    } catch (e: Throwable) {
+        exception = e
+        throw e
+    } finally {
+        if (exception == null) {
+            try {
+                close()
+            } catch (e: SQLException) {
+                e.printStackTrace()
+            }
+        } else {
+            try {
+                close()
+            } catch (closeException: Throwable) {
+                // Suppress exception if possible, or just ignore to keep original exception
+                // exception.addSuppressed(closeException) 
+            }
         }
     }
 }

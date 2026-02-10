@@ -28,14 +28,14 @@ help:
   reload-detail: "<color:#A0A0A0>   └ 重载配置"
 
 market:
-  created: "<color:#6BFF95>商店 <color:#FFD479><name> 创建成功！"
+  created: "<color:#6BFF95>商店 <color:#FFD479><name> <color:#6BFF95>创建成功！"
   create-failed: "<color:#FF6B6B>商店创建失败，请确保目标位置没有障碍物。"
   create-failed-limit: "<color:#FF6B6B>你已达到最大商店数量限制。"
   too-far: "<color:#FF6B6B>你离商店太远了，无法进行交易！"
   item-sold: "<color:#6BFF95>成功出售物品，获得 <color:#FFD479><price>。"
-  seller-sold-notification: "<color:#6BFF95>出售了 {amount} 个物品，预计获得 {price}"
+  seller-sold-notification: "<color:#6BFF95>出售了 <color:#FFD479>x{amount} <color:#FFD479>{item} <color:#6BFF95>，获得 <color:#FFD479>{price}"
   item-bought: "<color:#6BFF95>成功购买物品，花费 <color:#FFD479><price>。"
-  buy-bought-chat: "<color:#E6E6E6>购买: <color:#FFD479>{amount} <color:#E6E6E6>个物品"
+  buy-bought-chat: "<color:#E6E6E6>购买: <color:#FFD479>x{amount} <color:#E6E6E6>{item}"
   buy-cost-chat: "<color:#E6E6E6>总花费: <color:#FFD479>{cost}"
   buy-inventory-full: "<color:#FFD479>背包已满，物品已掉落在地面。"
   buy-fail-chat: "<color:#FF6B6B>购买失败: {message}"
@@ -48,18 +48,75 @@ market:
   no-shop: "<color:#FF6B6B>你还没有创建商店。"
   no-shop-target: "<color:#FF6B6B>请看向你的商店 NPC。"
   not-owner: "<color:#FF6B6B>这不是你的商店。"
+  cannot-buy-own: "<color:#FF6B6B>你不能购买自己的物品。"
+  cannot-buy-own-action: "<color:#FF6B6B>你不能购买自己的物品。请右键点击下架。"
+  default-shop-name: "<color:#FFD479>{player} <color:#A0A0A0>的商店"
+  default-shop-desc: "欢迎光临！"
+  create-error-loading: "<color:#FF6B6B>创建成功但在加载时出错。"
+  create-error-db: "<color:#FF6B6B>数据库错误，创建失败。"
+  no-shop-id: "<color:#FF6B6B>你没有 ID 为 <color:#FFD479>{id} <color:#FF6B6B>的商店。"
+  remove-failed: "<color:#FF6B6B>删除失败。"
+  multiple-shops-target: "<color:#FF6B6B>你有多个商店，请看着你要操作的商店 NPC。"
+  not-your-shop: "<color:#FF6B6B>这不属于你的商店。"
+  blacklisted: "<color:#FF6B6B>此物品已被禁止上架。"
 
 board:
-  title: "全服留言板"
+  title: "<color:#FFD479>全服留言板"
   post-btn: "<color:#6BFF95>发布留言"
   post-btn-lore: "<color:#A0A0A0>点击在聊天栏输入内容"
   message-posted: "<color:#6BFF95>留言发布成功！"
   message-renewed: "<color:#6BFF95>留言续期成功！"
   message-expired: "<color:#FFD479>你的留言已过期。"
+  enter-message: "<color:#6BFF95>请在聊天栏输入留言内容："
+  timeout: "<color:#FF6B6B>输入超时，操作已取消。"
+
+command:
+  list:
+    header: "<color:#FFD479>=== 你的商店列表 ({count}) ==="
+    entry: "<color:#A0A0A0>ID: <color:#E6E6E6>{id} <color:#A0A0A0>| 名称: <color:#E6E6E6>{name} <color:#A0A0A0>| 位置: <color:#E6E6E6>{x},{y},{z} ({world})"
+  remove:
+    invalid-id: "<color:#FF6B6B>无效的商店 ID。"
+    usage: "<color:#FF6B6B>请看着你的商店 NPC 输入此命令，或指定商店 ID: /market remove <ID>"
+  name:
+    usage: "<color:#FF6B6B>用法: /market name <名称>"
+  desc:
+    usage: "<color:#FF6B6B>用法: /market desc <介绍>"
+  skin:
+    usage: "<color:#FF6B6B>用法: /market skin <玩家名>"
+  sell:
+    usage: "<color:#FF6B6B>用法: /market sell <价格>"
+    no-item: "<color:#FF6B6B>请手持要出售的物品。"
+    success: "<color:#FFD479>x{amount} <color:#FFD479>{item} <color:#6BFF95>上架成功，预计获得 <color:#FFD479>{price}"
+  admin:
+    list:
+      header: "<color:#FFD479>=== 商店列表 ({count}) ==="
+      entry: "<color:#A0A0A0>ID: {id} | Owner: {owner} | Name: {name}"
+    ban:
+      no-item: "<color:#FF6B6B>请手持要封禁的物品。"
+      unbanned: "<color:#6BFF95>物品已解封。"
+      banned: "<color:#FF6B6B>物品已封禁。"
+    fee:
+      no-item: "<color:#FF6B6B>请手持物品。"
+      hash: "<color:#6BFF95>物品 Hash: <color:#FFD479>{hash}"
+      hint: "<color:#A0A0A0>请使用 /market admin fee <费率> 来设置此物品的特殊费率。"
+      set: "<color:#6BFF95>成功设置物品 <color:#FFD479>{item} <color:#6BFF95>的手续费率为 <color:#FFD479>{rate}%"
+      current: "<color:#6BFF95>当前物品手续费率: <color:#FFD479>{rate}% <color:#A0A0A0>({hash})"
+    help:
+      reload: "<color:#6BFF95>/market admin reload <color:#A0A0A0>- 重载配置"
+      list: "<color:#6BFF95>/market admin list <color:#A0A0A0>- 列出商店"
+      ban: "<color:#6BFF95>/market admin ban <color:#A0A0A0>- 封禁/解封手持物品"
+      fee: "<color:#6BFF95>/market admin fee [费率] <color:#A0A0A0>- 查看/设置手持物品手续费"
+
+time:
+  expired: "<color:#FF6B6B>已过期"
+  days: "<color:#E6E6E6>天"
+  hours: "<color:#E6E6E6>小时"
+  minutes: "<color:#E6E6E6>分"
+  seconds: "<color:#E6E6E6>秒"
 
 gui:
   loading: "<color:#FFD479>加载中..."
-  title: "全球市场 <color:#A0A0A0>- 第 {page} 页"
+  title: "<color:#E6E6E6>全球市场 <color:#A0A0A0>- 第 {page} 页"
   
   admin-ban-title: "<color:#FF6B6B>封禁物品列表 <color:#A0A0A0>- 第 {page} 页"
   admin-ban-hash: "<color:#A0A0A0>Hash: <color:#FF6B6B>{hash}"
@@ -67,6 +124,7 @@ gui:
   
   admin-fee-title: "<color:#FFD479>特殊费率列表 <color:#A0A0A0>- 第 {page} 页"
   admin-fee-rate: "<color:#A0A0A0>费率: <color:#FFD479>{rate}"
+  admin-fee-rate-lore: "<color:#A0A0A0>手续费率: <color:#FFD479>{rate}%"
   admin-fee-hash: "<color:#A0A0A0>Hash: <color:#FFD479>{hash}"
 
   item-price: "<color:#A0A0A0>起售价: <color:#FFD479>{price}"
@@ -78,7 +136,7 @@ gui:
   stock-entry: "<color:#A0A0A0>  <color:#E6E6E6>{price}: {bar} <color:#A0A0A0>({amount})"
   
   buy:
-    title: "购买物品"
+    title: "<color:#E6E6E6>购买物品"
     min-price: "<color:#A0A0A0>最低价: <color:#FFD479>{price}"
     total-stock: "<color:#A0A0A0>总库存: <color:#FFD479>{stock}"
     quantity-btn: "<color:#FFD479>购买数量: {quantity}"
