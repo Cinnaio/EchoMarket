@@ -31,6 +31,7 @@ class GuiManager(private val plugin: EchoMarket) : Listener {
     private val confirmHashKey = NamespacedKey(plugin, "confirm_hash")
     private val confirmAmountKey = NamespacedKey(plugin, "confirm_amount")
     private val confirmShopKey = NamespacedKey(plugin, "confirm_shop_id")
+    private val boostKey = NamespacedKey(plugin, "boost_btn")
 
     private val filler = ItemStack(Material.GRAY_STAINED_GLASS_PANE).apply {
         itemMeta = itemMeta.apply { displayName(Component.empty()) }
@@ -55,12 +56,18 @@ class GuiManager(private val plugin: EchoMarket) : Listener {
         inv.setItem(49, boardIcon)
 
         shops.take(45).forEach { shop ->
-            val icon = ItemStack(Material.PLAYER_HEAD) // 简单起见不设皮肤了，或者可以异步设
-            val meta = icon.itemMeta
-            meta.displayName(MessageUtil.parse("<color:#6BFF95>${shop.name}"))
+            val icon = ItemStack(Material.PLAYER_HEAD)
+            val meta = icon.itemMeta as org.bukkit.inventory.meta.SkullMeta
+            meta.owningPlayer = Bukkit.getOfflinePlayer(shop.ownerUuid)
+            
+            val heatComponent = formatHeat(shop.heat)
+            meta.displayName(MessageUtil.parse("<color:#6BFF95>${shop.name} <gray>#${shop.index} ").append(heatComponent))
+            
             val lore = mutableListOf<Component>()
-            lore.add(MessageUtil.parse("<color:#A0A0A0>店主: <color:#E6E6E6>${shop.ownerName}"))
             lore.add(MessageUtil.parse("<color:#FFD479>${shop.description}"))
+            lore.add(Component.empty())
+            lore.add(MessageUtil.parse("<color:#A0A0A0>店主: <color:#E6E6E6>${shop.ownerName}"))
+            lore.add(MessageUtil.parse("<color:#A0A0A0>位置: <color:#E6E6E6>${shop.location.world.name} (${shop.location.blockX}, ${shop.location.blockY}, ${shop.location.blockZ})"))
             meta.lore(lore)
             meta.persistentDataContainer.set(shopIdKey, PersistentDataType.INTEGER, shop.id)
             icon.itemMeta = meta
@@ -138,6 +145,24 @@ class GuiManager(private val plugin: EchoMarket) : Listener {
                 inv.addItem(templateItem)
             }
         }
+        
+        if (shop.ownerUuid == player.uniqueId) {
+            val boostBtn = ItemStack(Material.EXPERIENCE_BOTTLE)
+            val bMeta = boostBtn.itemMeta
+            bMeta.displayName(MessageUtil.parse("<color:#6BFF95>提升热力值 (置顶)"))
+            val cost = plugin.config.getDouble("market.heat.boost.price-per-point", 100.0)
+            val amount = plugin.config.getInt("market.heat.boost.purchase-amount", 1)
+            val lore = mutableListOf<Component>()
+            lore.add(MessageUtil.parse("<gray>当前置顶分: <yellow>${shop.boost}"))
+            lore.add(MessageUtil.parse("<gray>购买价格: <gold>$cost <gray>金币"))
+            lore.add(MessageUtil.parse("<gray>购买数量: <green>$amount <gray>点"))
+            lore.add(Component.empty())
+            lore.add(MessageUtil.parse("<yellow>点击购买"))
+            bMeta.lore(lore)
+            bMeta.persistentDataContainer.set(boostKey, PersistentDataType.BYTE, 1.toByte())
+            boostBtn.itemMeta = bMeta
+            inv.setItem(50, boostBtn)
+        }
 
         player.openInventory(inv)
     }
@@ -162,11 +187,13 @@ class GuiManager(private val plugin: EchoMarket) : Listener {
             meta.displayName(MessageUtil.parse("<color:#FFD479>留言 #${msg.id}"))
             val lore = mutableListOf<Component>()
             lore.add(MessageUtil.parse("<color:#E6E6E6>${msg.content}"))
-            lore.add(MessageUtil.parse("<color:#A0A0A0>发布者: ${msg.ownerName}"))
+            lore.add(Component.empty())
+            lore.add(MessageUtil.parse("<color:#A0A0A0>发布者: <color:#E6E6E6>${msg.ownerName}"))
             val timeLeft = (msg.expireAt - System.currentTimeMillis()) / 1000
-            lore.add(MessageUtil.parse("<color:#FF6B6B>剩余时间: ${formatDuration(timeLeft)}"))
+            lore.add(MessageUtil.parse("<color:#FF6B6B>剩余时间: <color:#E6E6E6>${formatDuration(timeLeft)}"))
             if (msg.ownerUuid == player.uniqueId) {
-                lore.add(MessageUtil.parse("<color:#6BFF95>点击续期"))
+                lore.add(Component.empty())
+                lore.add(MessageUtil.parse("<color:#6BFF95>点击续期 <gray>(<white>${plugin.config.getDouble("board.renew-price")}续期一天<gray>)"))
                 meta.persistentDataContainer.set(boardIdKey, PersistentDataType.INTEGER, msg.id)
             }
             meta.lore(lore)
@@ -377,10 +404,25 @@ class GuiManager(private val plugin: EchoMarket) : Listener {
 
     private fun fillBorders(inv: Inventory) {
         val size = inv.size
-        for (i in 0 until 9) inv.setItem(i, filler)
-        for (i in size - 9 until size) inv.setItem(i, filler)
-        for (i in 0 until size step 9) inv.setItem(i, filler)
-        for (i in 8 until size step 9) inv.setItem(i, filler)
+        for (i in 0 until size) {
+            if (i < 9 || i >= size - 9 || i % 9 == 0 || i % 9 == 8) {
+                if (inv.getItem(i) == null) {
+                    inv.setItem(i, filler)
+                }
+            }
+        }
+    }
+
+    private fun formatHeat(heat: Double): Component {
+        val value = heat.toInt()
+        val color = when {
+            value < 100 -> "<color:#CCCCCC>" // Gray
+            value < 500 -> "<gradient:#55FF55:#00AA00>" // Green
+            value < 1000 -> "<gradient:#55FFFF:#00AAAA>" // Aqua
+            value < 5000 -> "<gradient:#FF55FF:#AA00AA>" // Purple
+            else -> "<rainbow>" // Rainbow
+        }
+        return MessageUtil.parse("<gray>($color$value<gray>热力值)")
     }
 
     private fun formatDuration(seconds: Long): String {
@@ -422,6 +464,33 @@ class GuiManager(private val plugin: EchoMarket) : Listener {
         } else if (holder is ShopHolder) {
             if (item == backButton) {
                 openMarketList(player)
+                return
+            }
+            
+            if (item.hasItemMeta() && item.itemMeta.persistentDataContainer.has(boostKey, PersistentDataType.BYTE)) {
+                val cost = plugin.config.getDouble("market.heat.boost.price-per-point", 100.0)
+                val amount = plugin.config.getInt("market.heat.boost.purchase-amount", 1).toDouble()
+                
+                if (!EchoMarket.economy.has(player, cost)) {
+                    MessageUtil.send(player, "<market.insufficient-funds>")
+                    return
+                }
+                
+                val withdraw = EchoMarket.economy.withdrawPlayer(player, cost)
+                if (withdraw.transactionSuccess()) {
+                    if (plugin.storage.addShopBoost(holder.shop.id, amount)) {
+                         MessageUtil.send(player, "<green>购买成功！商店热力值已提升。")
+                         val newShop = plugin.storage.getShop(holder.shop.ownerUuid)
+                         if (newShop != null) {
+                             openShopGui(player, newShop)
+                         }
+                    } else {
+                         MessageUtil.send(player, "<red>购买失败：数据库错误。")
+                         EchoMarket.economy.depositPlayer(player, cost)
+                    }
+                } else {
+                    MessageUtil.send(player, "<market.insufficient-funds>")
+                }
                 return
             }
             
@@ -638,7 +707,7 @@ class GuiManager(private val plugin: EchoMarket) : Listener {
             }
             
             // 记录日志
-            plugin.storage.logTransaction(player.uniqueId, shop.ownerUuid, itemHash, count, item.price)
+            plugin.storage.logTransaction(player.uniqueId, shop.ownerUuid, shop.id, itemHash, count, item.price)
         }
         
         // MessageUtil.send(player, "<market.item-bought>", mapOf("price" to totalPrice.toString()))

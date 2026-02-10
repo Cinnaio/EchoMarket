@@ -101,11 +101,17 @@ command:
       hint: "<color:#A0A0A0>请使用 /market admin fee <费率> 来设置此物品的特殊费率。"
       set: "<color:#6BFF95>成功设置物品 <color:#FFD479>{item} <color:#6BFF95>的手续费率为 <color:#FFD479>{rate}%"
       current: "<color:#6BFF95>当前物品手续费率: <color:#FFD479>{rate}% <color:#A0A0A0>({hash})"
+    heat:
+      usage: "<color:#FF6B6B>用法: /market admin heat <set|give|take> <玩家名> <数值> [序号]"
+      success: "<color:#6BFF95>成功对玩家 <color:#FFD479>{player} <color:#6BFF95>执行 <color:#FFD479>{action} <color:#6BFF95>操作，数值: <color:#FFD479>{amount} <color:#A0A0A0>(生效: {count} 个商店)"
+      failed: "<color:#FF6B6B>操作失败，可能是玩家不存在或没有商店。"
+      not-found-index: "<color:#FF6B6B>操作失败，未找到序号为 <color:#FFD479>{index} <color:#FF6B6B>的商店。"
     help:
       reload: "<color:#6BFF95>/market admin reload <color:#A0A0A0>- 重载配置"
       list: "<color:#6BFF95>/market admin list <color:#A0A0A0>- 列出商店"
       ban: "<color:#6BFF95>/market admin ban <color:#A0A0A0>- 封禁/解封手持物品"
       fee: "<color:#6BFF95>/market admin fee [费率] <color:#A0A0A0>- 查看/设置手持物品手续费"
+      heat: "<color:#6BFF95>/market admin heat <操作> <玩家> <数值> [序号] <color:#A0A0A0>- 管理热力值"
 
 time:
   expired: "<color:#FF6B6B>已过期"

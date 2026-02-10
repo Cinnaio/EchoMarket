@@ -290,6 +290,75 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
                             }
                         }
                     }
+                    "heat" -> {
+                        // /market admin heat <set|give|take> <player> <amount> [index]
+                        if (args.size < 5) {
+                            MessageUtil.send(sender, "<command.admin.heat.usage>")
+                            return true
+                        }
+                        
+                        val action = args[2].lowercase()
+                        val targetName = args[3]
+                        val amountStr = args[4]
+                        val amount = amountStr.toDoubleOrNull()
+                        val targetIndex = if (args.size > 5) args[5].toIntOrNull() else null
+                        
+                        if (amount == null) {
+                            MessageUtil.send(sender, "<general.invalid-amount>")
+                            return true
+                        }
+                        
+                        val target = Bukkit.getPlayerExact(targetName)
+                        val targetUuid = if (target != null) {
+                            target.uniqueId
+                        } else {
+                             // Try offline player
+                             val offline = Bukkit.getOfflinePlayer(targetName)
+                             if (offline.hasPlayedBefore()) offline.uniqueId else null
+                        }
+                        
+                        if (targetUuid == null) {
+                            MessageUtil.send(sender, "<general.player-not-found>")
+                            return true
+                        }
+                        
+                        val shops = plugin.storage.getShops(targetUuid)
+                        if (shops.isEmpty()) {
+                            MessageUtil.send(sender, "<market.no-shop>")
+                            return true
+                        }
+                        
+                        var successCount = 0
+                        shops.forEach { shop ->
+                            // If index specified, check match. Else, apply to all.
+                            if (targetIndex != null && shop.index != targetIndex) {
+                                return@forEach
+                            }
+                            
+                            val result = when (action) {
+                                "set" -> plugin.storage.setShopBoost(shop.id, amount)
+                                "give" -> plugin.storage.addShopBoost(shop.id, amount)
+                                "take" -> plugin.storage.addShopBoost(shop.id, -amount)
+                                else -> false
+                            }
+                            if (result) successCount++
+                        }
+                        
+                        if (successCount > 0) {
+                            MessageUtil.send(sender, "<command.admin.heat.success>", mapOf(
+                                "action" to action,
+                                "player" to targetName,
+                                "amount" to amount.toString(),
+                                "count" to successCount.toString()
+                            ))
+                        } else {
+                            if (targetIndex != null) {
+                                MessageUtil.send(sender, "<command.admin.heat.not-found-index>", mapOf("index" to targetIndex.toString()))
+                            } else {
+                                MessageUtil.send(sender, "<command.admin.heat.failed>")
+                            }
+                        }
+                    }
                     else -> sendAdminHelp(sender)
                 }
             }
@@ -319,7 +388,7 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
                  }
                  "admin" -> {
                      if (sender.hasPermission("market.admin")) {
-                         return listOf("reload", "list", "ban", "fee").filter { it.startsWith(args[1], ignoreCase = true) }
+                         return listOf("reload", "list", "ban", "fee", "heat").filter { it.startsWith(args[1], ignoreCase = true) }
                      }
                  }
                  "skin" -> {
@@ -336,6 +405,27 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
                 if (args[1].equals("list", ignoreCase = true)) {
                     return listOf("ban", "fee").filter { it.startsWith(args[2], ignoreCase = true) }
                 }
+                if (args[1].equals("heat", ignoreCase = true)) {
+                    return listOf("set", "give", "take").filter { it.startsWith(args[2], ignoreCase = true) }
+                }
+            }
+        }
+        
+        if (args.size == 4) {
+            if (args[0].equals("admin", ignoreCase = true) && args[1].equals("heat", ignoreCase = true)) {
+                return Bukkit.getOnlinePlayers().map { it.name }.filter { it.startsWith(args[3], ignoreCase = true) }
+            }
+        }
+        
+        if (args.size == 5) {
+            if (args[0].equals("admin", ignoreCase = true) && args[1].equals("heat", ignoreCase = true)) {
+                return listOf("<amount>").filter { it.startsWith(args[4], ignoreCase = true) }
+            }
+        }
+
+        if (args.size == 6) {
+            if (args[0].equals("admin", ignoreCase = true) && args[1].equals("heat", ignoreCase = true)) {
+                return listOf("<index>").filter { it.startsWith(args[5], ignoreCase = true) }
             }
         }
         
@@ -347,6 +437,7 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
         MessageUtil.send(sender, "<command.admin.help.list>", emptyMap(), false)
         MessageUtil.send(sender, "<command.admin.help.ban>", emptyMap(), false)
         MessageUtil.send(sender, "<command.admin.help.fee>", emptyMap(), false)
+        MessageUtil.send(sender, "<command.admin.help.heat>", emptyMap(), false)
     }
 
     private fun sendHelp(sender: CommandSender) {

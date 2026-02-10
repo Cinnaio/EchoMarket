@@ -36,11 +36,13 @@ interface Storage {
     fun cleanExpiredBoardMessages()
     
     // Logs
-    fun logTransaction(buyer: UUID, seller: UUID, itemHash: String, amount: Int, price: Double)
+    fun logTransaction(buyer: UUID, seller: UUID, shopId: Int, itemHash: String, amount: Int, price: Double)
     
     // Statistics
     fun getTransactionStats(player: UUID, since: Long): TransactionStats
     fun getShopCount(player: UUID): Int
+    fun addShopBoost(shopId: Int, amount: Double): Boolean
+    fun setShopBoost(shopId: Int, amount: Double): Boolean
 }
 
 data class TransactionStats(
@@ -54,7 +56,10 @@ data class ShopData(
     val ownerName: String,
     val location: Location,
     val name: String,
-    val description: String
+    val description: String,
+    val index: Int = 1,
+    val boost: Double = 0.0,
+    val heat: Double = 0.0
 )
 
 data class ItemData(
@@ -97,6 +102,7 @@ class StorageImpl(private val plugin: EchoMarket) : Storage {
         dataSource = HikariDataSource(config)
         
         createTables()
+        migrateSchema()
     }
     
     private fun createTables() {
@@ -116,7 +122,9 @@ class StorageImpl(private val plugin: EchoMarket) : Storage {
                     z DOUBLE NOT NULL,
                     name VARCHAR(64),
                     description TEXT,
-                    created_at LONG
+                    created_at LONG,
+                    boost DOUBLE DEFAULT 0.0,
+                    player_shop_index INTEGER DEFAULT 1
                 )
             """)
             
@@ -152,12 +160,30 @@ class StorageImpl(private val plugin: EchoMarket) : Storage {
                     id INTEGER PRIMARY KEY $autoInc,
                     buyer_uuid VARCHAR(36) NOT NULL,
                     seller_uuid VARCHAR(36) NOT NULL,
+                    shop_id INTEGER DEFAULT -1,
                     item_hash VARCHAR(64) NOT NULL,
                     amount INTEGER NOT NULL,
                     price DOUBLE NOT NULL,
                     timestamp LONG
                 )
             """)
+        }
+    }
+    
+    private fun migrateSchema() {
+        dataSource.connection.use { conn ->
+            val stmt = conn.createStatement()
+            try {
+                stmt.execute("ALTER TABLE shops ADD COLUMN boost DOUBLE DEFAULT 0.0")
+            } catch (ignored: SQLException) {}
+            
+            try {
+                stmt.execute("ALTER TABLE transactions ADD COLUMN shop_id INTEGER DEFAULT -1")
+            } catch (ignored: SQLException) {}
+
+            try {
+                stmt.execute("ALTER TABLE shops ADD COLUMN player_shop_index INTEGER DEFAULT 1")
+            } catch (ignored: SQLException) {}
         }
     }
 
@@ -170,7 +196,16 @@ class StorageImpl(private val plugin: EchoMarket) : Storage {
     override fun createShop(owner: UUID, ownerName: String, location: Location, name: String, desc: String): Boolean {
         return try {
             dataSource.connection.use { conn ->
-                val ps = conn.prepareStatement("INSERT INTO shops (owner_uuid, owner_name, world, x, y, z, name, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                // Calculate next index
+                var nextIndex = 1
+                val psCount = conn.prepareStatement("SELECT MAX(player_shop_index) as max_idx FROM shops WHERE owner_uuid = ?")
+                psCount.setString(1, owner.toString())
+                val rs = psCount.executeQuery()
+                if (rs.next()) {
+                    nextIndex = rs.getInt("max_idx") + 1
+                }
+                
+                val ps = conn.prepareStatement("INSERT INTO shops (owner_uuid, owner_name, world, x, y, z, name, description, created_at, player_shop_index) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
                 ps.setString(1, owner.toString())
                 ps.setString(2, ownerName)
                 ps.setString(3, location.world.name)
@@ -180,6 +215,7 @@ class StorageImpl(private val plugin: EchoMarket) : Storage {
                 ps.setString(7, name)
                 ps.setString(8, desc)
                 ps.setLong(9, System.currentTimeMillis())
+                ps.setInt(10, nextIndex)
                 ps.executeUpdate() > 0
             }
         } catch (e: SQLException) {
@@ -196,13 +232,18 @@ class StorageImpl(private val plugin: EchoMarket) : Storage {
             if (rs.next()) {
                 val world = plugin.server.getWorld(rs.getString("world")) ?: return null
                 val loc = Location(world, rs.getDouble("x"), rs.getDouble("y"), rs.getDouble("z"))
+                val boost = try { rs.getDouble("boost") } catch (e: Exception) { 0.0 }
+                val index = try { rs.getInt("player_shop_index") } catch (e: Exception) { 1 }
                 return ShopData(
                     rs.getInt("id"),
                     UUID.fromString(rs.getString("owner_uuid")),
                     rs.getString("owner_name"),
                     loc,
                     rs.getString("name"),
-                    rs.getString("description")
+                    rs.getString("description"),
+                    index,
+                    boost,
+                    0.0 // Individual fetch doesn't need heat calculation usually
                 )
             }
         }
@@ -219,13 +260,18 @@ class StorageImpl(private val plugin: EchoMarket) : Storage {
                 val world = plugin.server.getWorld(rs.getString("world"))
                 if (world != null) {
                     val loc = Location(world, rs.getDouble("x"), rs.getDouble("y"), rs.getDouble("z"))
+                    val boost = try { rs.getDouble("boost") } catch (e: Exception) { 0.0 }
+                    val index = try { rs.getInt("player_shop_index") } catch (e: Exception) { 1 }
                     shops.add(ShopData(
                         rs.getInt("id"),
                         UUID.fromString(rs.getString("owner_uuid")),
                         rs.getString("owner_name"),
                         loc,
                         rs.getString("name"),
-                        rs.getString("description")
+                        rs.getString("description"),
+                        index,
+                        boost,
+                        0.0
                     ))
                 }
             }
@@ -247,23 +293,39 @@ class StorageImpl(private val plugin: EchoMarket) : Storage {
     }
     override fun getAllShops(): List<ShopData> {
         val list = mutableListOf<ShopData>()
+        val wTx = plugin.config.getDouble("market.heat.weights.total-transactions", 1.0)
+        val wBoost = plugin.config.getDouble("market.heat.weights.boost", 10.0)
+        
         dataSource.connection.use { conn ->
-            val ps = conn.prepareStatement("SELECT * FROM shops")
+            val sql = """
+                SELECT s.*, 
+                       (SELECT COUNT(*) FROM transactions t WHERE t.seller_uuid = s.owner_uuid) as tx_count 
+                FROM shops s
+            """
+            val ps = conn.prepareStatement(sql)
             val rs = ps.executeQuery()
             while (rs.next()) {
                 val world = plugin.server.getWorld(rs.getString("world")) ?: continue
                 val loc = Location(world, rs.getDouble("x"), rs.getDouble("y"), rs.getDouble("z"))
+                val boost = try { rs.getDouble("boost") } catch (e: Exception) { 0.0 }
+                val index = try { rs.getInt("player_shop_index") } catch (e: Exception) { 1 }
+                val txCount = rs.getInt("tx_count")
+                val heat = (txCount * wTx) + (boost * wBoost)
+                
                 list.add(ShopData(
                     rs.getInt("id"),
                     UUID.fromString(rs.getString("owner_uuid")),
                     rs.getString("owner_name"),
                     loc,
                     rs.getString("name"),
-                    rs.getString("description")
+                    rs.getString("description"),
+                    index,
+                    boost,
+                    heat
                 ))
             }
         }
-        return list
+        return list.sortedByDescending { it.heat }
     }
 
     override fun updateShopName(shopId: Int, name: String) {
@@ -384,16 +446,45 @@ class StorageImpl(private val plugin: EchoMarket) : Storage {
         }
     }
 
-    override fun logTransaction(buyer: UUID, seller: UUID, itemHash: String, amount: Int, price: Double) {
+    override fun logTransaction(buyer: UUID, seller: UUID, shopId: Int, itemHash: String, amount: Int, price: Double) {
          dataSource.connection.use { conn ->
-            val ps = conn.prepareStatement("INSERT INTO transactions (buyer_uuid, seller_uuid, item_hash, amount, price, timestamp) VALUES (?, ?, ?, ?, ?, ?)")
+            val ps = conn.prepareStatement("INSERT INTO transactions (buyer_uuid, seller_uuid, shop_id, item_hash, amount, price, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)")
             ps.setString(1, buyer.toString())
             ps.setString(2, seller.toString())
-            ps.setString(3, itemHash)
-            ps.setInt(4, amount)
-            ps.setDouble(5, price)
-            ps.setLong(6, System.currentTimeMillis())
+            ps.setInt(3, shopId)
+            ps.setString(4, itemHash)
+            ps.setInt(5, amount)
+            ps.setDouble(6, price)
+            ps.setLong(7, System.currentTimeMillis())
             ps.executeUpdate()
+        }
+    }
+
+    override fun addShopBoost(shopId: Int, amount: Double): Boolean {
+        return try {
+            dataSource.connection.use { conn ->
+                val ps = conn.prepareStatement("UPDATE shops SET boost = boost + ? WHERE id = ?")
+                ps.setDouble(1, amount)
+                ps.setInt(2, shopId)
+                ps.executeUpdate() > 0
+            }
+        } catch (e: SQLException) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    override fun setShopBoost(shopId: Int, amount: Double): Boolean {
+        return try {
+            dataSource.connection.use { conn ->
+                val ps = conn.prepareStatement("UPDATE shops SET boost = ? WHERE id = ?")
+                ps.setDouble(1, amount)
+                ps.setInt(2, shopId)
+                ps.executeUpdate() > 0
+            }
+        } catch (e: SQLException) {
+            e.printStackTrace()
+            false
         }
     }
 

@@ -1,104 +1,86 @@
-# EchoMarket - 全球市场
+# EchoMarket
 
-**EchoMarket** 是一个专为 Minecraft 1.21+ (Paper/Folia) 服务器设计的现代化全球市场插件。它结合了传统的全球市场功能与沉浸式的 NPC 商店体验，允许玩家创建属于自己的虚拟商店，并通过 GUI 界面进行便捷的物品买卖。
+<div align="center">
 
-## ✨ 主要特性 (Features)
+![Java](https://img.shields.io/badge/Java-21-orange.svg)
+![Kotlin](https://img.shields.io/badge/Kotlin-2.0-purple.svg)
+![Minecraft](https://img.shields.io/badge/Minecraft-1.21-green.svg)
+![License](https://img.shields.io/badge/License-MIT-blue.svg)
 
-*   **全球市场 & 个人商店**: 
-    *   玩家可以创建多个个人商店（由 NPC 代表）。
-    *   支持查看全服所有商店的列表。
-    *   基于 GUI 的直观操作界面。
-*   **沉浸式 NPC 交互**:
-    *   深度集成 **FancyNpcs**，每个商店都对应一个实体 NPC。
-    *   支持自定义 NPC 皮肤（`/market skin`）和名称。
-    *   玩家通过点击 NPC 即可打开商店界面。
-*   **Folia 原生支持**:
-    *   完全兼容 Folia 多线程服务端架构，确保在高性能服务器上的稳定运行。
-*   **灵活的经济与税收系统**:
-    *   **交易税**: 卖家出售物品时自动扣除一定比例的手续费。
-    *   **特殊物品税率**: 管理员可为特定稀有物品设置独立的税率（支持通过 GUI/命令 管理）。
-    *   **取消订单费用**: 防止恶意刷屏，取消上架物品可设置扣除手续费。
-*   **黑名单系统**:
-    *   管理员可以禁止特定物品（基于 Hash 匹配）上架销售。
-    *   支持 NBT 数据的精确匹配。
-*   **数据存储**:
-    *   支持 **SQLite** (默认，开箱即用) 和 **MySQL** (适合大型服务器)。
-*   **完全可配置**:
-    *   所有提示消息、GUI 布局、税率规则等均可在配置文件中自定义。
+**EchoMarket** 是一个基于 **FancyNpcs** 和 **Vault** 的现代化玩家商店与全球市场插件。
+专为 1.21+ 服务器设计，支持 Folia，提供沉浸式的 NPC 商店交互体验。
 
-## 🛠️ 前置插件 (Dependencies)
+</div>
 
-在安装本插件前，请确保您的服务器已安装以下前置：
+## ✨ 功能特性
 
-1.  **Java 21** (最低要求)
-2.  **Vault** (经济系统支持)
-3.  **FancyNpcs** (NPC 功能支持)
-    *   *注: FancyNpcs 可能需要 ProtocolLib*
+- **🏪 NPC 实体商店**：基于 FancyNpcs，玩家可以创建实体 NPC 作为商店，支持点击交互。
+- **🌍 全球市场菜单**：提供直观的 GUI 菜单浏览全服商店和商品。
+- **💰 经济系统集成**：完美支持 Vault 经济系统，交易安全可靠。
+- **📊 交易统计**：内置交易日志与统计系统，支持查询历史交易额与单数。
+- **� 热力值系统**：商店根据热力值智能排序，支持交易量权重与付费置顶（Boost）。
+- **🔢 多商店管理**：玩家商店自动分配序号（#1, #2...），支持精准定位与管理。
+- **� 留言板系统**：提供玩家留言板功能，增强服务器社交属性。
+- **⚡ 高性能**：支持 Folia 多线程架构，数据库操作异步处理（支持 SQLite/MySQL）。
+- **🔌 PlaceholderAPI 支持**：提供丰富的 PAPI 变量展示玩家市场数据。
+- **🛠️ 管理员工具**：支持违禁品封禁列表、自定义手续费率等管理功能。
 
-## 📥 安装指南 (Installation)
+## � 依赖项
 
-1.  下载 `EchoMarket-1.6.8.jar` 文件。
-2.  将插件放入服务器的 `plugins` 文件夹中。
-3.  确保已安装所有前置插件。
-4.  启动/重启服务器。
-5.  (可选) 编辑 `plugins/EchoMarket/config.yml` 配置数据库连接和税率。
+在使用本插件前，请确保服务器已安装以下前置插件：
 
-## 📖 命令列表 (Commands)
+| 插件名称 | 必须 | 说明 |
+| :--- | :---: | :--- |
+| **Vault** | ✅ | 经济系统基础 API |
+| **FancyNpcs** | ✅ | 用于生成和管理商店 NPC |
+| **PlaceholderAPI** | ❌ | (可选) 用于变量展示 |
 
-### 🛒 玩家命令
-| 命令 | 描述 |
-| :--- | :--- |
-| `/market` | 打开全球市场主菜单 |
-| `/market create [名称]` | 在脚下创建一个新的商店 NPC |
-| `/market sell <价格>` | 将手持物品上架到最近的商店 |
-| `/market list` | 查看自己拥有的所有商店 |
-| `/market remove [ID]` | 删除指定 ID 的商店（或删除准星对准的商店） |
-| `/market name <名称>` | 修改当前商店的名称 |
-| `/market desc <介绍>` | 修改当前商店的介绍信息 |
-| `/market skin <玩家名>` | 修改当前商店 NPC 的皮肤为指定玩家的皮肤 |
+## 📥 安装说明
 
-### 🛡️ 管理员命令
-| 命令 | 描述 | 权限 |
+1. 下载 `EchoMarket-x.x.x.jar`。
+2. 将插件放入服务器的 `plugins` 文件夹。
+3. 确保已安装所有[必要前置](#-依赖项)。
+4. 启动服务器，插件将自动生成配置文件。
+5. (可选) 在 `config.yml` 中配置数据库连接（默认为 SQLite）。
+
+## � 命令列表
+
+主命令: `/market` 或 `/m`
+
+| 子命令 | 权限 | 描述 |
 | :--- | :--- | :--- |
-| `/market admin reload` | 重载配置文件 | `market.admin` |
-| `/market admin list` | 列出服务器内所有商店信息 | `market.admin` |
-| `/market admin list fee` | 列出所有特殊税率物品 | `market.admin` |
-| `/market admin list ban` | 列出所有黑名单物品 | `market.admin` |
-| `/market admin ban` | 封禁/解封当前手持的物品 | `market.admin` |
-| `/market admin fee [费率]` | 查看或设置手持物品的特殊手续费率 | `market.admin` |
+| `/m` | 无 | 打开全球市场菜单 |
+| `/m help` | 无 | 查看帮助信息 |
+| `/m create [名称]` | 无 | 在当前位置创建一个商店 NPC |
+| `/m list` | `market.list` | 查看自己拥有的商店列表 |
+| `/m remove [ID]` | `market.remove` | 删除指定 ID 的商店（或查看的商店） |
+| `/m name <名称>` | 无 | 修改当前看向商店的名称 |
+| `/m desc <描述>` | 无 | 修改当前看向商店的描述 |
+| `/m sell <价格>` | 无 | 将手中物品上架到当前看向的商店 |
+| `/m admin` | `market.admin` | 打开管理员管理面板 (封禁/费率) |
+| `/m admin heat` | `market.admin` | 管理商店热力值 (set/give/take) |
+| `/m reload` | `market.admin` | 重载配置文件 |
 
-## 🔐 权限节点 (Permissions)
+## 🔧 配置文件
 
-| 权限节点 | 默认 | 描述 |
-| :--- | :--- | :--- |
-| `market.list` | true | 允许玩家列出自己的商店 |
-| `market.remove` | true | 允许玩家删除自己的商店 |
-| `market.admin` | op | 管理员权限 (重载/封禁/费率管理等) |
-| `market.shops.limit.unlimited`| op | 允许玩家创建无限数量的商店 |
-| `market.shops.limit.<数量>` | - | 限制玩家可创建的最大商店数量 (例如 `market.shops.limit.5`) |
+插件首次运行后会在 `plugins/EchoMarket/config.yml` 生成配置文件。
+支持自定义：
+- 数据库类型 (SQLite/MySQL)
+- 交易手续费率
+- 商店创建限制
+- 语言消息 (Language)
 
-## ⚙️ 配置文件 (Configuration)
+## 🧩 PlaceholderAPI 变量
 
-`config.yml` 核心配置项说明：
+EchoMarket 提供了丰富的 PAPI 变量支持，详情请查阅 [PLACEHOLDERS.md](PLACEHOLDERS.md)。
 
-```yaml
-market:
-  # NPC 可视距离（格）
-  npc-view-distance: 32
-  # 交易距离限制（格），玩家必须在商店 NPC 附近才能交易
-  distance-limit: 4
-  
-  # 交易服务费 (百分比)
-  transaction-fee: 3.0
-  
-  # 下架/取消订单服务费
-  fee-type: percent # percent(百分比) 或 fixed(固定金额)
-  fee-value: 3
-  
-  # 数据库设置
-  database:
-    type: sqlite # 或 mysql
-```
+示例：
+- `%echomarket_volume_7d%`: 7天内交易总额
+- `%echomarket_has_shop%`: 是否拥有商店
+
+## 🤝 贡献与支持
+
+如果你发现了 Bug 或有功能建议，欢迎提交 Issue 或 Pull Request。
 
 ---
-*Developed by Cinnaio*
+*Created by Cinnaio*

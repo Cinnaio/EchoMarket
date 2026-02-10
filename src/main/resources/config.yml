@@ -31,6 +31,20 @@ market:
   # 百分比数值，例如 5.0 表示 5%
   special-fees: {}
 
+  heat:
+    # 热力值计算权重
+    weights:
+      # 总交易次数权重
+      total-transactions: 1.0
+      # 商店置顶积分权重 (1积分 = 1权重)
+      boost: 10.0
+    # 置顶相关配置
+    boost:
+      # 购买置顶积分的价格 (每1积分)
+      price-per-point: 100.0
+      # 每次购买的积分数量 (GUI按钮)
+      purchase-amount: 1
+
 board:
   # 留言展示时长（秒）
   duration-seconds: 86400

@@ -35,6 +35,7 @@ class EchoMarketExpansion(private val plugin: EchoMarket) : PlaceholderExpansion
         // transactions_7d, transactions_24h, transactions_30d
         // has_shop
         // shop_count
+        // heat_total, heat_max
 
         when (params.lowercase()) {
             "has_shop" -> {
@@ -44,6 +45,31 @@ class EchoMarketExpansion(private val plugin: EchoMarket) : PlaceholderExpansion
             "shop_count" -> {
                 return plugin.storage.getShopCount(player.uniqueId).toString()
             }
+            "heat_total" -> {
+                val shops = plugin.storage.getShops(player.uniqueId)
+                val totalHeat = shops.sumOf { it.heat }
+                return String.format("%.0f", totalHeat)
+            }
+            "heat_max" -> {
+                val shops = plugin.storage.getShops(player.uniqueId)
+                val maxHeat = shops.maxOfOrNull { it.heat } ?: 0.0
+                return String.format("%.0f", maxHeat)
+            }
+        }
+        
+        if (params.startsWith("heat_")) {
+             // heat_<index>
+             val indexStr = params.substringAfter("heat_")
+             val index = indexStr.toIntOrNull()
+             if (index != null) {
+                 val shops = plugin.storage.getShops(player.uniqueId)
+                 val shop = shops.find { it.index == index }
+                 return if (shop != null) {
+                     String.format("%.0f", shop.heat)
+                 } else {
+                     "0"
+                 }
+             }
         }
         
         if (params.startsWith("volume_")) {
