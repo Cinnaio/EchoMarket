@@ -24,21 +24,38 @@ object ItemUtil {
         return sha256(serialized)
     }
     
-    @Suppress("DEPRECATION")
     fun serializeItemStack(item: ItemStack): String {
-        val io = ByteArrayOutputStream()
-        val os = BukkitObjectOutputStream(io)
-        os.writeObject(item)
-        os.flush()
-        return Base64.getEncoder().encodeToString(io.toByteArray())
+        // Prefer Paper's serializeAsBytes for full NBT support (including custom data)
+        try {
+            return Base64.getEncoder().encodeToString(item.serializeAsBytes())
+        } catch (e: NoSuchMethodError) {
+            // Fallback for older server versions (should not happen on 1.21+)
+            val io = ByteArrayOutputStream()
+            val os = BukkitObjectOutputStream(io)
+            os.writeObject(item)
+            os.flush()
+            return Base64.getEncoder().encodeToString(io.toByteArray())
+        }
     }
     
     @Suppress("DEPRECATION")
     fun deserializeItemStack(data: String): ItemStack {
         val bytes = Base64.getDecoder().decode(data)
-        val `in` = ByteArrayInputStream(bytes)
-        val `is` = BukkitObjectInputStream(`in`)
-        return `is`.readObject() as ItemStack
+        
+        // Try Paper's deserializeBytes first
+        try {
+            return ItemStack.deserializeBytes(bytes)
+        } catch (e: Exception) {
+            // Fallback to legacy Java Serialization (for old database entries)
+            try {
+                val `in` = ByteArrayInputStream(bytes)
+                val `is` = BukkitObjectInputStream(`in`)
+                return `is`.readObject() as ItemStack
+            } catch (e2: Exception) {
+                // If both fail, throw the original error or e2
+                throw e
+            }
+        }
     }
 
     private fun sha256(input: String): String {

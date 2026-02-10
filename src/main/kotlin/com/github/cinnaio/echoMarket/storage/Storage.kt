@@ -37,7 +37,16 @@ interface Storage {
     
     // Logs
     fun logTransaction(buyer: UUID, seller: UUID, itemHash: String, amount: Int, price: Double)
+    
+    // Statistics
+    fun getTransactionStats(player: UUID, since: Long): TransactionStats
+    fun getShopCount(player: UUID): Int
 }
+
+data class TransactionStats(
+    val totalVolume: Double,
+    val transactionCount: Int
+)
 
 data class ShopData(
     val id: Int,
@@ -386,6 +395,36 @@ class StorageImpl(private val plugin: EchoMarket) : Storage {
             ps.setLong(6, System.currentTimeMillis())
             ps.executeUpdate()
         }
+    }
+
+    override fun getTransactionStats(player: UUID, since: Long): TransactionStats {
+        var totalVolume = 0.0
+        var transactionCount = 0
+        dataSource.connection.use { conn ->
+            val ps = conn.prepareStatement("SELECT SUM(amount * price) as volume, COUNT(*) as count FROM transactions WHERE (buyer_uuid = ? OR seller_uuid = ?) AND timestamp >= ?")
+            ps.setString(1, player.toString())
+            ps.setString(2, player.toString())
+            ps.setLong(3, since)
+            val rs = ps.executeQuery()
+            if (rs.next()) {
+                totalVolume = rs.getDouble("volume")
+                transactionCount = rs.getInt("count")
+            }
+        }
+        return TransactionStats(totalVolume, transactionCount)
+    }
+
+    override fun getShopCount(player: UUID): Int {
+        var count = 0
+        dataSource.connection.use { conn ->
+            val ps = conn.prepareStatement("SELECT COUNT(*) as count FROM shops WHERE owner_uuid = ?")
+            ps.setString(1, player.toString())
+            val rs = ps.executeQuery()
+            if (rs.next()) {
+                count = rs.getInt("count")
+            }
+        }
+        return count
     }
 }
 

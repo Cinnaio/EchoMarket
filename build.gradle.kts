@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.github.cinnaio"
-version = "1.6.8"
+version = "1.7.5"
 
 repositories {
     mavenCentral()
@@ -14,6 +14,7 @@ repositories {
     }
     maven("https://jitpack.io")
     maven("https://repo.fancyinnovations.com/releases")
+    maven("https://repo.extendedclip.com/content/repositories/placeholderapi/")
 }
 
 dependencies {
@@ -25,6 +26,7 @@ dependencies {
     compileOnly("com.github.MilkBowl:VaultAPI:1.7") {
         exclude(group = "org.bukkit", module = "bukkit")
     }
+    compileOnly("me.clip:placeholderapi:2.11.6")
     compileOnly("de.oliver:FancyNpcs:2.9.2")
 }
 

@@ -2,13 +2,14 @@ name: EchoMarket
 version: '${version}'
 main: com.github.cinnaio.echomarket.EchoMarket
 api-version: '1.21'
-load: STARTUP
+load: POSTWORLD
 authors: [ Cinnaio ]
 folia-supported: true
 depend:
   - Vault
   - FancyNpcs
-softdepend: []
+softdepend:
+  - PlaceholderAPI
 commands:
   market:
     description: 市场主命令

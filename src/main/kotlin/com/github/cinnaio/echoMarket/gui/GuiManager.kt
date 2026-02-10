@@ -83,7 +83,7 @@ class GuiManager(private val plugin: EchoMarket) : Listener {
             val templateItem = itemList.first().itemStack.clone()
             val meta = templateItem.itemMeta
             // Use existing lore or new list, but ensure we clear old market lore if any
-            val lore = mutableListOf<Component>()
+            val lore = meta.lore()?.toMutableList() ?: mutableListOf<Component>()
             
             val priceGroups = itemList.groupBy { it.price }.toSortedMap()
             var totalStock = 0
@@ -134,6 +134,7 @@ class GuiManager(private val plugin: EchoMarket) : Listener {
                 meta.persistentDataContainer.set(itemHashKey, PersistentDataType.STRING, hash)
                 templateItem.itemMeta = meta
                 templateItem.amount = 1
+                
                 inv.addItem(templateItem)
             }
         }
@@ -183,7 +184,7 @@ class GuiManager(private val plugin: EchoMarket) : Listener {
         // 13: Display Item
         val displayItem = itemStack.clone()
         val meta = displayItem.itemMeta
-        val lore = meta.lore() ?: mutableListOf()
+        val lore = meta.lore()?.toMutableList() ?: mutableListOf()
         lore.add(Component.empty())
         lore.add(MessageUtil.get("gui.buy.min-price", mapOf("price" to minPrice.toString())))
         lore.add(MessageUtil.get("gui.buy.total-stock", mapOf("stock" to stock.toString())))
@@ -248,7 +249,7 @@ class GuiManager(private val plugin: EchoMarket) : Listener {
             
             val meta = item.itemMeta
             // 保留物品原名，并在 Lore 中添加 Hash 信息
-            val lore = meta.lore() ?: mutableListOf()
+            val lore = meta.lore()?.toMutableList() ?: mutableListOf()
             lore.add(Component.empty())
             lore.add(MessageUtil.get("gui.admin-ban-type-hash"))
             lore.add(MessageUtil.get("gui.admin-ban-hash", mapOf("hash" to hash)))
@@ -257,6 +258,7 @@ class GuiManager(private val plugin: EchoMarket) : Listener {
             // Store hash for removal
             meta.persistentDataContainer.set(itemHashKey, PersistentDataType.STRING, hash)
             item.itemMeta = meta
+            
             inv.addItem(item)
         }
         
@@ -312,7 +314,7 @@ class GuiManager(private val plugin: EchoMarket) : Listener {
             
             // If it's a real item, we append the rate to the lore or display name
             // Let's keep the item name and add rate info in lore
-            val lore = meta.lore() ?: mutableListOf()
+            val lore = meta.lore()?.toMutableList() ?: mutableListOf()
             lore.add(Component.empty())
             lore.add(MessageUtil.get("gui.admin-fee-rate-lore", mapOf("rate" to rate.toString())))
             lore.add(MessageUtil.get("gui.admin-fee-hash", mapOf("hash" to hash)))
@@ -424,8 +426,8 @@ class GuiManager(private val plugin: EchoMarket) : Listener {
             }
             
             // 购买/下架逻辑
-            if (item.hasItemMeta() && item.itemMeta.persistentDataContainer.has(itemHashKey, PersistentDataType.STRING)) {
-                val hash = item.itemMeta.persistentDataContainer.get(itemHashKey, PersistentDataType.STRING)!!
+            val hash = item.itemMeta?.persistentDataContainer?.get(itemHashKey, PersistentDataType.STRING)
+            if (hash != null) {
                 
                 if (holder.shop.ownerUuid == player.uniqueId) {
                     if (event.isRightClick) {
@@ -518,19 +520,17 @@ class GuiManager(private val plugin: EchoMarket) : Listener {
                 }
             } else {
                  // Check if it's a valid item with hash
-                 if (item.hasItemMeta() && item.itemMeta.persistentDataContainer.has(itemHashKey, PersistentDataType.STRING)) {
+                 val hash = item.itemMeta?.persistentDataContainer?.get(itemHashKey, PersistentDataType.STRING)
+                 if (hash != null) {
                      // Click to remove from blacklist
-                     val hash = item.itemMeta.persistentDataContainer.get(itemHashKey, PersistentDataType.STRING)
-                     if (hash != null) {
-                         val blacklist = plugin.config.getStringList("market.blacklist").toMutableList()
-                         val entry = blacklist.find { it.startsWith(hash) }
-                         if (entry != null) {
-                             blacklist.remove(entry)
-                             plugin.config.set("market.blacklist", blacklist)
-                             plugin.saveConfig()
-                             MessageUtil.send(player, "<command.admin.ban.unbanned>")
-                             openAdminBanList(player, holder.page) // Refresh
-                         }
+                     val blacklist = plugin.config.getStringList("market.blacklist").toMutableList()
+                     val entry = blacklist.find { it.startsWith(hash) }
+                     if (entry != null) {
+                         blacklist.remove(entry)
+                         plugin.config.set("market.blacklist", blacklist)
+                         plugin.saveConfig()
+                         MessageUtil.send(player, "<command.admin.ban.unbanned>")
+                         openAdminBanList(player, holder.page) // Refresh
                      }
                  }
             }
