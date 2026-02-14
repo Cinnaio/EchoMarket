@@ -4,6 +4,8 @@ import com.github.cinnaio.echomarket.board.BoardManager
 import com.github.cinnaio.echomarket.command.MarketCommand
 import com.github.cinnaio.echomarket.config.ConfigManager
 import com.github.cinnaio.echomarket.gui.GuiManager
+import com.github.cinnaio.echomarket.hook.WorldGuardHook
+import com.github.cinnaio.echomarket.listener.PlayerListener
 import com.github.cinnaio.echomarket.market.MarketManager
 import com.github.cinnaio.echomarket.npc.NpcManager
 import com.github.cinnaio.echomarket.storage.Storage
@@ -24,6 +26,7 @@ class EchoMarket : JavaPlugin() {
     lateinit var guiManager: GuiManager
     lateinit var marketManager: MarketManager
     lateinit var boardManager: BoardManager
+    lateinit var worldGuardHook: WorldGuardHook
 
     companion object {
         lateinit var instance: EchoMarket
@@ -73,9 +76,11 @@ class EchoMarket : JavaPlugin() {
         guiManager = GuiManager(this)
         marketManager = MarketManager(this)
         boardManager = BoardManager(this)
+        worldGuardHook = WorldGuardHook()
         
         // Listeners
         server.pluginManager.registerEvents(guiManager, this)
+        server.pluginManager.registerEvents(PlayerListener(this), this)
         
         // Commands
         getCommand("market")?.setExecutor(MarketCommand(this))

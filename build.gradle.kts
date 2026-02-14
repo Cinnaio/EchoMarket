@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.github.cinnaio"
-version = "1.7.8"
+version = "1.8.2"
 
 repositories {
     mavenCentral()
@@ -15,6 +15,7 @@ repositories {
     maven("https://jitpack.io")
     maven("https://repo.fancyinnovations.com/releases")
     maven("https://repo.extendedclip.com/content/repositories/placeholderapi/")
+    maven("https://maven.enginehub.org/repo/")
 }
 
 dependencies {
@@ -28,6 +29,12 @@ dependencies {
     }
     compileOnly("me.clip:placeholderapi:2.11.6")
     compileOnly("de.oliver:FancyNpcs:2.9.2")
+    compileOnly("com.sk89q.worldguard:worldguard-bukkit:7.0.12") {
+        exclude(group = "com.google.guava")
+        exclude(group = "com.google.code.gson")
+        exclude(group = "it.unimi.dsi")
+        exclude(group = "org.apache.logging.log4j")
+    }
 }
 
 tasks {

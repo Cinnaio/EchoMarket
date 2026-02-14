@@ -13,12 +13,11 @@ import org.bukkit.Bukkit
 class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabCompleter {
 
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>): Boolean {
-        if (sender !is Player) {
-            MessageUtil.send(sender, "<general.not-player>")
-            return true
-        }
-
         if (args.isEmpty()) {
+            if (sender !is Player) {
+                MessageUtil.send(sender, "<general.not-player>")
+                return true
+            }
             plugin.marketManager.openMarket(sender)
             return true
         }
@@ -36,10 +35,18 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
                 MessageUtil.send(sender, "<general.reload-success>")
             }
             "create" -> {
+                if (sender !is Player) {
+                    MessageUtil.send(sender, "<general.not-player>")
+                    return true
+                }
                 val name = if (args.size > 1) args.drop(1).joinToString(" ") else null
                 plugin.marketManager.createShop(sender, name, null)
             }
             "list" -> {
+                if (sender !is Player) {
+                    MessageUtil.send(sender, "<general.not-player>")
+                    return true
+                }
                 val shops = plugin.storage.getShops(sender.uniqueId)
                 if (shops.isEmpty()) {
                     MessageUtil.send(sender, "<market.no-shop>")
@@ -58,6 +65,10 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
                 }
             }
             "remove" -> {
+                if (sender !is Player) {
+                    MessageUtil.send(sender, "<general.not-player>")
+                    return true
+                }
                 // If ID provided
                 if (args.size > 1) {
                     val id = args[1].toIntOrNull()
@@ -87,30 +98,85 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
                 MessageUtil.send(sender, "<command.remove.usage>")
             }
             "name" -> {
+                if (sender !is Player) {
+                    MessageUtil.send(sender, "<general.not-player>")
+                    return true
+                }
                 if (args.size < 2) {
                     MessageUtil.send(sender, "<command.name.usage>")
                     return true
                 }
-                val name = args.drop(1).joinToString(" ")
-                plugin.marketManager.updateName(sender, name)
+                
+                var targetIndex: Int? = null
+                var nameStartIndex = 1
+                
+                // Check if first arg is an index
+                val potentialIndex = args[1].toIntOrNull()
+                if (potentialIndex != null) {
+                    val shops = plugin.storage.getShops(sender.uniqueId)
+                    if (shops.any { it.index == potentialIndex }) {
+                        targetIndex = potentialIndex
+                        nameStartIndex = 2
+                    }
+                }
+                
+                if (args.size <= nameStartIndex) {
+                    // Only index provided or no name provided
+                     MessageUtil.send(sender, "<command.name.usage>")
+                     return true
+                }
+
+                val name = args.drop(nameStartIndex).joinToString(" ")
+                plugin.marketManager.updateName(sender, name, targetIndex)
             }
             "desc" -> {
+                if (sender !is Player) {
+                    MessageUtil.send(sender, "<general.not-player>")
+                    return true
+                }
                 if (args.size < 2) {
                     MessageUtil.send(sender, "<command.desc.usage>")
                     return true
                 }
-                val desc = args.drop(1).joinToString(" ")
-                plugin.marketManager.updateDesc(sender, desc)
+                
+                var targetIndex: Int? = null
+                var nameStartIndex = 1
+                
+                val potentialIndex = args[1].toIntOrNull()
+                if (potentialIndex != null) {
+                    val shops = plugin.storage.getShops(sender.uniqueId)
+                    if (shops.any { it.index == potentialIndex }) {
+                        targetIndex = potentialIndex
+                        nameStartIndex = 2
+                    }
+                }
+                
+                if (args.size <= nameStartIndex) {
+                     MessageUtil.send(sender, "<command.desc.usage>")
+                     return true
+                }
+                
+                val desc = args.drop(nameStartIndex).joinToString(" ")
+                plugin.marketManager.updateDesc(sender, desc, targetIndex)
             }
             "skin" -> {
+                if (sender !is Player) {
+                    MessageUtil.send(sender, "<general.not-player>")
+                    return true
+                }
                 if (args.size < 2) {
                      MessageUtil.send(sender, "<command.skin.usage>")
                      return true
                 }
                 val skinName = args[1]
-                plugin.npcManager.updateNpcSkin(sender, skinName)
+                val targetIndex = if (args.size > 2) args[2].toIntOrNull() else null
+                plugin.npcManager.updateNpcSkin(sender, skinName, targetIndex)
             }
             "sell" -> {
+                if (sender !is Player) {
+                    MessageUtil.send(sender, "<general.not-player>")
+                    return true
+                }
                 if (args.size < 2) {
                     MessageUtil.send(sender, "<command.sell.usage>")
                     return true
@@ -184,6 +250,9 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
                     MessageUtil.send(sender, "<general.no-permission>")
                     return true
                 }
+                
+                val adminUuid = if (sender is Player) sender.uniqueId else java.util.UUID.fromString("00000000-0000-0000-0000-000000000000")
+                
                 if (args.size < 2) {
                     sendAdminHelp(sender)
                     return true
@@ -197,10 +266,18 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
                         if (args.size > 2) {
                             when (args[2].lowercase()) {
                                 "ban" -> {
+                                    if (sender !is Player) {
+                                        MessageUtil.send(sender, "<general.not-player>")
+                                        return true
+                                    }
                                     plugin.guiManager.openAdminBanList(sender)
                                     return true
                                 }
                                 "fee" -> {
+                                    if (sender !is Player) {
+                                        MessageUtil.send(sender, "<general.not-player>")
+                                        return true
+                                    }
                                     plugin.guiManager.openAdminFeeList(sender)
                                     return true
                                 }
@@ -220,6 +297,10 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
                     }
                     "ban" -> {
                         // /market admin ban <item> (hand)
+                        if (sender !is Player) {
+                            MessageUtil.send(sender, "<general.not-player>")
+                            return true
+                        }
                         val item = sender.inventory.itemInMainHand
                         if (item.type.isAir) {
                             MessageUtil.send(sender, "<command.admin.ban.no-item>")
@@ -232,6 +313,7 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
                         if (existingEntry != null) {
                             blacklist.remove(existingEntry)
                             MessageUtil.send(sender, "<command.admin.ban.unbanned>")
+                            plugin.storage.logAdminAction(adminUuid, sender.name, "BAN_ITEM_REMOVE", "Hash: $hash", "Unbanned")
                         } else {
                             // 为了在 GUI 中显示正确的材质，我们存储 "Hash|Base64"
                             // 归一化数量为 1 再序列化，用于展示
@@ -240,6 +322,7 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
                             val serialized = ItemUtil.serializeItemStack(displayItem)
                             blacklist.add("$hash|$serialized")
                             MessageUtil.send(sender, "<command.admin.ban.banned>")
+                            plugin.storage.logAdminAction(adminUuid, sender.name, "BAN_ITEM_ADD", "Hash: $hash", "Banned")
                         }
                         plugin.config.set("market.blacklist", blacklist)
                         plugin.saveConfig()
@@ -247,6 +330,10 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
                     "fee" -> {
                          // /market admin fee [rate]
                          // If rate is provided, set fee. If not, just show hash/info.
+                         if (sender !is Player) {
+                            MessageUtil.send(sender, "<general.not-player>")
+                            return true
+                        }
                          val item = sender.inventory.itemInMainHand
                          if (item.type.isAir) {
                             MessageUtil.send(sender, "<command.admin.fee.no-item>")
@@ -272,6 +359,7 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
                             plugin.config.set("market.special-fees-data.$hash", serialized)
                             
                             plugin.saveConfig()
+                            plugin.storage.logAdminAction(adminUuid, sender.name, "SET_FEE", "Hash: $hash", "Rate: $rate")
                             MessageUtil.send(sender, "<command.admin.fee.set>", mapOf(
                                 "rate" to rate.toString(),
                                 "item" to ItemUtil.getDisplayName(item)
@@ -345,6 +433,7 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
                         }
                         
                         if (successCount > 0) {
+                            plugin.storage.logAdminAction(adminUuid, sender.name, "MODIFY_HEAT", "Target: $targetName", "Action: $action, Amount: $amount, Count: $successCount")
                             MessageUtil.send(sender, "<command.admin.heat.success>", mapOf(
                                 "action" to action,
                                 "player" to targetName,
@@ -359,7 +448,183 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
                             }
                         }
                     }
-                    else -> sendAdminHelp(sender)
+                    "remove" -> {
+                        // /market admin remove (looks at NPC)
+                        if (args.size == 2) {
+                            if (sender !is Player) {
+                                MessageUtil.send(sender, "<general.not-player>")
+                                return true
+                            }
+                            val targetBlock = sender.getTargetBlockExact(5)
+                            if (targetBlock != null) {
+                                val shopId = plugin.npcManager.getShopIdAt(targetBlock.location, 1.5)
+                                if (shopId != null) {
+                                    val shop = plugin.storage.getShop(shopId)
+                                    if (shop != null) {
+                                        if (plugin.storage.removeShop(shopId)) {
+                                            plugin.npcManager.removeNpc(shopId)
+                                            MessageUtil.send(sender, "<market.shop-removed>")
+                                            notifyPlayer(shop.ownerUuid, "market.admin-shop-removed", mapOf("name" to shop.name, "admin" to sender.name))
+                                            plugin.storage.logAdminAction(adminUuid, sender.name, "REMOVE_SHOP", "ShopID: $shopId", "Owner: ${shop.ownerName}, Name: ${shop.name}")
+                                        } else {
+                                            MessageUtil.send(sender, "<market.remove-failed>")
+                                        }
+                                    } else {
+                                        plugin.npcManager.removeNpc(shopId)
+                                        MessageUtil.send(sender, "<market.shop-removed>")
+                                    }
+                                    return true
+                                }
+                            }
+                            MessageUtil.send(sender, "<command.admin.remove.usage>")
+                            return true
+                        }
+                        
+                        // /market admin remove <player> [index]
+                         val targetName = args[2]
+                         val targetIndex = if (args.size > 3) args[3].toIntOrNull() else null
+                         
+                         val target = Bukkit.getPlayerExact(targetName)
+                         val targetUuid = if (target != null) {
+                             target.uniqueId
+                         } else {
+                              val offline = Bukkit.getOfflinePlayer(targetName)
+                              if (offline.hasPlayedBefore()) offline.uniqueId else null
+                         }
+                         
+                         if (targetUuid == null) {
+                             MessageUtil.send(sender, "<general.player-not-found>")
+                             return true
+                         }
+                         
+                         val shops = plugin.storage.getShops(targetUuid)
+                         if (shops.isEmpty()) {
+                             MessageUtil.send(sender, "<market.no-shop>")
+                             return true
+                         }
+                         
+                         if (targetIndex != null) {
+                                val shop = shops.find { it.index == targetIndex }
+                                if (shop != null) {
+                                    if (plugin.storage.removeShop(shop.id)) {
+                                        plugin.npcManager.removeNpc(shop.id)
+                                        MessageUtil.send(sender, "<market.shop-removed>")
+                                        notifyPlayer(shop.ownerUuid, "market.admin-shop-removed", mapOf("name" to shop.name, "admin" to sender.name))
+                                        plugin.storage.logAdminAction(adminUuid, sender.name, "REMOVE_SHOP", "ShopID: ${shop.id}", "Owner: ${shop.ownerName}, Name: ${shop.name}")
+                                    } else {
+                                        MessageUtil.send(sender, "<market.remove-failed>")
+                                    }
+                                } else {
+                                 MessageUtil.send(sender, "<command.admin.remove.not-found-index>", mapOf("index" to targetIndex.toString()))
+                             }
+                         } else {
+                             if (shops.size == 1) {
+                                val shop = shops[0]
+                                if (plugin.storage.removeShop(shop.id)) {
+                                    plugin.npcManager.removeNpc(shop.id)
+                                    MessageUtil.send(sender, "<market.shop-removed>")
+                                    notifyPlayer(shop.ownerUuid, "market.admin-shop-removed", mapOf("name" to shop.name, "admin" to sender.name))
+                                    plugin.storage.logAdminAction(adminUuid, sender.name, "REMOVE_SHOP", "ShopID: ${shop.id}", "Owner: ${shop.ownerName}, Name: ${shop.name}")
+                                } else {
+                                    MessageUtil.send(sender, "<market.remove-failed>")
+                                }
+                            } else {
+                                 MessageUtil.send(sender, "<command.admin.remove.specify-index>")
+                                 shops.forEach { s ->
+                                     MessageUtil.send(sender, "<command.admin.remove.list-entry>", mapOf(
+                                         "id" to s.id.toString(),
+                                         "index" to s.index.toString(),
+                                         "name" to s.name
+                                     ))
+                                 }
+                             }
+                         }
+                     }
+                     "board" -> {
+                         if (args.size < 3 || !args[2].equals("remove", ignoreCase = true)) {
+                             MessageUtil.send(sender, "<command.admin.board.usage>")
+                             return true
+                         }
+                         
+                         if (args.size < 4) {
+                             MessageUtil.send(sender, "<command.admin.board.usage>")
+                             return true
+                         }
+                         
+                         val targetStr = args[3]
+                         val targetId = targetStr.toIntOrNull()
+                         
+                         // Try removing by ID if it's an integer
+                        if (targetId != null) {
+                            val msg = plugin.storage.getBoardMessage(targetId)
+                            if (msg != null) {
+                                if (plugin.storage.deleteBoardMessage(targetId)) {
+                                    MessageUtil.send(sender, "<board.removed-id>", mapOf("id" to targetId.toString()))
+                                    notifyPlayer(msg.ownerUuid, "market.admin-message-removed", mapOf("content" to msg.content, "admin" to sender.name))
+                                    plugin.storage.logAdminAction(adminUuid, sender.name, "REMOVE_BOARD", "BoardID: $targetId", "Owner: ${msg.ownerName}, Content: ${msg.content}")
+                                    return true
+                                }
+                            }
+                            // If deletion failed, it might not be an ID but a player name that is a number (unlikely but possible)
+                            // or simply ID not found. Continue to try as player name.
+                        }
+                         
+                         // Remove by Player Name
+                         val targetPlayer = Bukkit.getOfflinePlayer(targetStr)
+                         if (!targetPlayer.hasPlayedBefore() && targetPlayer.player == null) {
+                             // If targetId was not null, we already tried ID. So it's neither valid ID nor valid player.
+                             if (targetId != null) {
+                                  MessageUtil.send(sender, "<board.remove-failed>")
+                             } else {
+                                  MessageUtil.send(sender, "<general.player-not-found>")
+                             }
+                             return true
+                         }
+                         
+                         val msgs = plugin.storage.getBoardMessages(targetPlayer.uniqueId)
+                         if (msgs.isEmpty()) {
+                              MessageUtil.send(sender, "<board.no-messages>", mapOf("player" to targetStr))
+                              return true
+                         }
+                         
+                         if (msgs.size == 1) {
+                            val msg = msgs[0]
+                            plugin.storage.deleteBoardMessage(msg.id)
+                             MessageUtil.send(sender, "<board.removed-player>", mapOf("player" to targetStr))
+                             notifyPlayer(msg.ownerUuid, "market.admin-message-removed", mapOf("content" to msg.content, "admin" to sender.name))
+                             plugin.storage.logAdminAction(adminUuid, sender.name, "REMOVE_BOARD", "BoardID: ${msg.id}", "Owner: ${msg.ownerName}, Content: ${msg.content}")
+                             return true
+                        }
+                         
+                         // Check optional ID arg if multiple messages
+                         if (args.size > 4) {
+                             val specifiedId = args[4].toIntOrNull()
+                            if (specifiedId != null) {
+                                val msg = msgs.find { it.id == specifiedId }
+                                if (msg != null) {
+                                    plugin.storage.deleteBoardMessage(specifiedId)
+                                     MessageUtil.send(sender, "<board.removed-id>", mapOf("id" to specifiedId.toString()))
+                                     notifyPlayer(msg.ownerUuid, "market.admin-message-removed", mapOf("content" to msg.content, "admin" to sender.name))
+                                     plugin.storage.logAdminAction(adminUuid, sender.name, "REMOVE_BOARD", "BoardID: $specifiedId", "Owner: ${msg.ownerName}, Content: ${msg.content}")
+                                 } else {
+                                    MessageUtil.send(sender, "<board.id-not-owned>", mapOf("id" to specifiedId.toString(), "player" to targetStr))
+                                }
+                                return true
+                            }
+                         }
+                         
+                         // List messages
+                         MessageUtil.send(sender, "<board.multiple-messages>")
+                         msgs.forEach { msg ->
+                             val date = java.text.SimpleDateFormat("MM-dd HH:mm").format(java.util.Date(msg.expireAt))
+                             MessageUtil.send(sender, "<board.list-entry>", mapOf(
+                                 "id" to msg.id.toString(),
+                                 "content" to msg.content,
+                                 "expire" to date
+                             ))
+                         }
+                     }
+                     else -> sendAdminHelp(sender)
                 }
             }
             else -> {
@@ -388,7 +653,7 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
                  }
                  "admin" -> {
                      if (sender.hasPermission("market.admin")) {
-                         return listOf("reload", "list", "ban", "fee", "heat").filter { it.startsWith(args[1], ignoreCase = true) }
+                         return listOf("reload", "list", "ban", "fee", "heat", "remove", "board").filter { it.startsWith(args[1], ignoreCase = true) }
                      }
                  }
                  "skin" -> {
@@ -408,14 +673,33 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
                 if (args[1].equals("heat", ignoreCase = true)) {
                     return listOf("set", "give", "take").filter { it.startsWith(args[2], ignoreCase = true) }
                 }
+                if (args[1].equals("remove", ignoreCase = true)) {
+                    return Bukkit.getOnlinePlayers().map { it.name }.filter { it.startsWith(args[2], ignoreCase = true) }
+                }
+                if (args[1].equals("board", ignoreCase = true)) {
+                    return listOf("remove").filter { it.startsWith(args[2], ignoreCase = true) }
+                }
             }
         }
         
         if (args.size == 4) {
-            if (args[0].equals("admin", ignoreCase = true) && args[1].equals("heat", ignoreCase = true)) {
-                return Bukkit.getOnlinePlayers().map { it.name }.filter { it.startsWith(args[3], ignoreCase = true) }
-            }
-        }
+                             if (args[0].equals("admin", ignoreCase = true)) {
+                                  if (args[1].equals("heat", ignoreCase = true)) {
+                                      return Bukkit.getOnlinePlayers().map { it.name }.filter { it.startsWith(args[3], ignoreCase = true) }
+                                  }
+                                  if (args[1].equals("remove", ignoreCase = true)) {
+                                      return listOf("<index>")
+                                  }
+                                  if (args[1].equals("board", ignoreCase = true) && args[2].equals("remove", ignoreCase = true)) {
+                                      return Bukkit.getOnlinePlayers().map { it.name }.filter { it.startsWith(args[3], ignoreCase = true) }
+                                  }
+                             }
+                        }
+                        if (args.size == 5) {
+                            if (args[0].equals("admin", ignoreCase = true) && args[1].equals("board", ignoreCase = true) && args[2].equals("remove", ignoreCase = true)) {
+                                return listOf("<id>")
+                            }
+                        }
         
         if (args.size == 5) {
             if (args[0].equals("admin", ignoreCase = true) && args[1].equals("heat", ignoreCase = true)) {
@@ -438,6 +722,7 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
         MessageUtil.send(sender, "<command.admin.help.ban>", emptyMap(), false)
         MessageUtil.send(sender, "<command.admin.help.fee>", emptyMap(), false)
         MessageUtil.send(sender, "<command.admin.help.heat>", emptyMap(), false)
+        MessageUtil.send(sender, "<command.admin.help.board>", emptyMap(), false)
     }
 
     private fun sendHelp(sender: CommandSender) {
@@ -460,6 +745,16 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
         commands.forEach { (cmd, detail) ->
             MessageUtil.send(sender, "<help.$cmd>", emptyMap(), false)
             MessageUtil.send(sender, "<help.$detail>", emptyMap(), false)
+        }
+    }
+
+    private fun notifyPlayer(uuid: java.util.UUID, messageKey: String, placeholders: Map<String, String>) {
+        val player = Bukkit.getPlayer(uuid)
+        if (player != null && player.isOnline) {
+             MessageUtil.send(player, "<$messageKey>", placeholders)
+        } else {
+             val message = MessageUtil.format(messageKey, placeholders)
+             plugin.storage.addNotification(uuid, message)
         }
     }
 }

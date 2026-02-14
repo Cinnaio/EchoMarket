@@ -54,6 +54,18 @@ object MessageUtil {
         
         return parse(processedMessage)
     }
+
+    fun format(key: String, replacements: Map<String, String> = emptyMap()): String {
+        val configMsg = EchoMarket.instance.configManager.getMessage(key)
+        
+        var processedMessage = configMsg
+        replacements.forEach { (k, v) ->
+            processedMessage = processedMessage.replace("<$k>", v)
+            processedMessage = processedMessage.replace("{$k}", v)
+        }
+        
+        return processedMessage
+    }
     
     fun parse(message: String): Component {
         return mm.deserialize("<!italic>" + convertLegacyColors(message))

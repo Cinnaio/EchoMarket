@@ -24,12 +24,19 @@ class MarketManager(private val plugin: EchoMarket) {
 
         // 检查位置是否安全 (简单检查：必须是空气)
         val targetBlock = player.getTargetBlockExact(5)
-        if (targetBlock == null || !targetBlock.type.isSolid) {
+        if (targetBlock == null) {
             MessageUtil.send(player, "<market.create-failed>")
             return
         }
-        
+
         val loc = targetBlock.location.add(0.5, 1.0, 0.5)
+
+        // WorldGuard Check
+        if (!player.hasPermission("market.admin") && !plugin.worldGuardHook.canBuild(player, loc)) {
+            MessageUtil.send(player, "<market.create-denied-region>")
+            return
+        }
+        
         // 调整朝向面向玩家
         loc.yaw = player.location.yaw + 180
         
@@ -133,30 +140,50 @@ class MarketManager(private val plugin: EchoMarket) {
         return null
     }
 
-    fun updateName(player: Player, name: String) {
-        val shop = resolveTargetShop(player)
-        if (shop == null) {
+    fun updateName(player: Player, name: String, targetIndex: Int? = null) {
+        val shop = if (targetIndex != null) {
             val shops = plugin.storage.getShops(player.uniqueId)
-            if (shops.size > 1) {
-                MessageUtil.send(player, "<market.multiple-shops-target>")
+            shops.find { it.index == targetIndex }
+        } else {
+            resolveTargetShop(player)
+        }
+
+        if (shop == null) {
+            if (targetIndex != null) {
+                 MessageUtil.send(player, "<market.not-found-index>", mapOf("index" to targetIndex.toString()))
             } else {
-                MessageUtil.send(player, "<market.no-shop>")
+                val shops = plugin.storage.getShops(player.uniqueId)
+                if (shops.size > 1) {
+                    MessageUtil.send(player, "<market.multiple-shops-target>")
+                } else {
+                    MessageUtil.send(player, "<market.no-shop>")
+                }
             }
             return
         }
         plugin.storage.updateShopName(shop.id, name)
-        plugin.npcManager.updateNpcName(shop.location, name)
+        plugin.npcManager.updateNpcName(shop.id, name)
         MessageUtil.send(player, "<market.update-name>", mapOf("name" to name))
     }
 
-    fun updateDesc(player: Player, desc: String) {
-        val shop = resolveTargetShop(player)
-        if (shop == null) {
+    fun updateDesc(player: Player, desc: String, targetIndex: Int? = null) {
+        val shop = if (targetIndex != null) {
             val shops = plugin.storage.getShops(player.uniqueId)
-            if (shops.size > 1) {
-                MessageUtil.send(player, "<market.multiple-shops-target>")
+            shops.find { it.index == targetIndex }
+        } else {
+            resolveTargetShop(player)
+        }
+
+        if (shop == null) {
+             if (targetIndex != null) {
+                 MessageUtil.send(player, "<market.not-found-index>", mapOf("index" to targetIndex.toString()))
             } else {
-                MessageUtil.send(player, "<market.no-shop>")
+                val shops = plugin.storage.getShops(player.uniqueId)
+                if (shops.size > 1) {
+                    MessageUtil.send(player, "<market.multiple-shops-target>")
+                } else {
+                    MessageUtil.send(player, "<market.no-shop>")
+                }
             }
             return
         }

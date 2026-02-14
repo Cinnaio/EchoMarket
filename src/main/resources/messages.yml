@@ -30,10 +30,13 @@ help:
 market:
   created: "<color:#6BFF95>商店 <color:#FFD479><name> <color:#6BFF95>创建成功！"
   create-failed: "<color:#FF6B6B>商店创建失败，请确保目标位置没有障碍物。"
+  create-denied-region: "<color:#FF6B6B>你不能在这个区域创建商店。"
   create-failed-limit: "<color:#FF6B6B>你已达到最大商店数量限制。"
   too-far: "<color:#FF6B6B>你离商店太远了，无法进行交易！"
   item-sold: "<color:#6BFF95>成功出售物品，获得 <color:#FFD479><price>。"
   seller-sold-notification: "<color:#6BFF95>出售了 <color:#FFD479>x{amount} <color:#FFD479>{item} <color:#6BFF95>，获得 <color:#FFD479>{price}"
+  admin-shop-removed: "<color:#FF6B6B>管理员 {admin} 删除了你的商店: <color:#FFD479>{name}"
+  admin-message-removed: "<color:#FF6B6B>管理员 {admin} 删除了你的留言: <color:#FFD479>{content}"
   item-bought: "<color:#6BFF95>成功购买物品，花费 <color:#FFD479><price>。"
   buy-bought-chat: "<color:#E6E6E6>购买: <color:#FFD479>x{amount} <color:#E6E6E6>{item}"
   buy-cost-chat: "<color:#E6E6E6>总花费: <color:#FFD479>{cost}"
@@ -98,6 +101,11 @@ command:
     fee:
       no-item: "<color:#FF6B6B>请手持物品。"
       hash: "<color:#6BFF95>物品 Hash: <color:#FFD479>{hash}"
+    remove:
+      usage: "<color:#FF6B6B>用法: /market admin remove <玩家> [序号] 或 直视NPC"
+      not-found-index: "<color:#FF6B6B>未找到该玩家的商店序号: {index}"
+      specify-index: "<color:#FF6B6B>该玩家有多个商店，请指定序号:"
+      list-entry: "<color:#A0A0A0>ID: {id} | 序号: {index} | 名称: {name}"
       hint: "<color:#A0A0A0>请使用 /market admin fee <费率> 来设置此物品的特殊费率。"
       set: "<color:#6BFF95>成功设置物品 <color:#FFD479>{item} <color:#6BFF95>的手续费率为 <color:#FFD479>{rate}%"
       current: "<color:#6BFF95>当前物品手续费率: <color:#FFD479>{rate}% <color:#A0A0A0>({hash})"
@@ -106,12 +114,15 @@ command:
       success: "<color:#6BFF95>成功对玩家 <color:#FFD479>{player} <color:#6BFF95>执行 <color:#FFD479>{action} <color:#6BFF95>操作，数值: <color:#FFD479>{amount} <color:#A0A0A0>(生效: {count} 个商店)"
       failed: "<color:#FF6B6B>操作失败，可能是玩家不存在或没有商店。"
       not-found-index: "<color:#FF6B6B>操作失败，未找到序号为 <color:#FFD479>{index} <color:#FF6B6B>的商店。"
+    board:
+      usage: "<color:#FF6B6B>用法: /market admin board remove <玩家/ID> [ID]"
     help:
       reload: "<color:#6BFF95>/market admin reload <color:#A0A0A0>- 重载配置"
       list: "<color:#6BFF95>/market admin list <color:#A0A0A0>- 列出商店"
       ban: "<color:#6BFF95>/market admin ban <color:#A0A0A0>- 封禁/解封手持物品"
       fee: "<color:#6BFF95>/market admin fee [费率] <color:#A0A0A0>- 查看/设置手持物品手续费"
       heat: "<color:#6BFF95>/market admin heat <操作> <玩家> <数值> [序号] <color:#A0A0A0>- 管理热力值"
+      board: "<color:#6BFF95>/market admin board remove <玩家/ID> <color:#A0A0A0>- 管理留言板"
 
 time:
   expired: "<color:#FF6B6B>已过期"

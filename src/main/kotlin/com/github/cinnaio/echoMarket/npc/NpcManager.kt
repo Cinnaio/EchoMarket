@@ -78,9 +78,7 @@ class NpcManager(private val plugin: EchoMarket) : Listener {
         return null
     }
     
-    fun updateNpcName(location: Location, name: String) {
-        val shopId = getShopIdAt(location) ?: return
-        // Need to find by prefix again
+    fun updateNpcName(shopId: Int, name: String) {
         val manager = FancyNpcsPlugin.get().npcManager
         val npc = manager.getAllNpcs().find { it.data.name.startsWith("shop_${shopId}_") } ?: return
         
@@ -88,10 +86,26 @@ class NpcManager(private val plugin: EchoMarket) : Listener {
         npc.updateForAll()
     }
     
-    fun updateNpcSkin(player: Player, skinName: String) {
-        val shop = plugin.storage.getShop(player.uniqueId)
+    fun updateNpcSkin(player: Player, skinName: String, targetIndex: Int? = null) {
+        val shop = if (targetIndex != null) {
+            val shops = plugin.storage.getShops(player.uniqueId)
+            shops.find { it.index == targetIndex }
+        } else {
+            val shops = plugin.storage.getShops(player.uniqueId)
+            if (shops.size == 1) shops[0] else null
+        }
+
         if (shop == null) {
-             MessageUtil.send(player, "<market.no-shop>")
+             val shops = plugin.storage.getShops(player.uniqueId)
+             if (shops.isEmpty()) {
+                 MessageUtil.send(player, "<market.no-shop>")
+             } else {
+                 if (targetIndex != null) {
+                     MessageUtil.send(player, "<market.not-found-index>", mapOf("index" to targetIndex.toString()))
+                 } else {
+                     MessageUtil.send(player, "<market.multiple-shops-target>")
+                 }
+             }
              return
         }
         

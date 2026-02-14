@@ -17,6 +17,7 @@ interface Storage {
     // Shop
     fun createShop(owner: UUID, ownerName: String, location: Location, name: String, desc: String): Boolean
     fun getShop(owner: UUID): ShopData?
+    fun getShop(id: Int): ShopData?
     fun getShops(owner: UUID): List<ShopData>
     fun getAllShops(): List<ShopData>
     fun updateShopName(shopId: Int, name: String)
@@ -31,8 +32,11 @@ interface Storage {
     
     // Board
     fun addBoardMessage(owner: UUID, ownerName: String, content: String, duration: Long)
+    fun getBoardMessage(id: Int): BoardData?
     fun getBoardMessages(): List<BoardData>
+    fun getBoardMessages(owner: UUID): List<BoardData>
     fun renewBoardMessage(id: Int, duration: Long)
+    fun deleteBoardMessage(id: Int): Boolean
     fun cleanExpiredBoardMessages()
     
     // Logs
@@ -43,6 +47,14 @@ interface Storage {
     fun getShopCount(player: UUID): Int
     fun addShopBoost(shopId: Int, amount: Double): Boolean
     fun setShopBoost(shopId: Int, amount: Double): Boolean
+    
+    // Notifications
+    fun addNotification(player: UUID, message: String)
+    fun getNotifications(player: UUID): List<String>
+    fun deleteNotifications(player: UUID)
+
+    // Admin Log
+    fun logAdminAction(adminUuid: UUID, adminName: String, action: String, target: String, details: String)
 }
 
 data class TransactionStats(
@@ -167,6 +179,29 @@ class StorageImpl(private val plugin: EchoMarket) : Storage {
                     timestamp LONG
                 )
             """)
+            
+            // Notifications
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS notifications (
+                    id INTEGER PRIMARY KEY $autoInc,
+                    player_uuid VARCHAR(36) NOT NULL,
+                    message TEXT NOT NULL,
+                    created_at LONG
+                )
+            """)
+
+            // Admin Logs
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS admin_logs (
+                    id INTEGER PRIMARY KEY $autoInc,
+                    admin_uuid VARCHAR(36) NOT NULL,
+                    admin_name VARCHAR(16) NOT NULL,
+                    action VARCHAR(32) NOT NULL,
+                    target TEXT NOT NULL,
+                    details TEXT,
+                    timestamp LONG
+                )
+            """)
         }
     }
     
@@ -243,7 +278,33 @@ class StorageImpl(private val plugin: EchoMarket) : Storage {
                     rs.getString("description"),
                     index,
                     boost,
-                    0.0 // Individual fetch doesn't need heat calculation usually
+                    0.0
+                )
+            }
+        }
+        return null
+    }
+
+    override fun getShop(id: Int): ShopData? {
+        dataSource.connection.use { conn ->
+            val ps = conn.prepareStatement("SELECT * FROM shops WHERE id = ?")
+            ps.setInt(1, id)
+            val rs = ps.executeQuery()
+            if (rs.next()) {
+                val world = plugin.server.getWorld(rs.getString("world")) ?: return null
+                val loc = Location(world, rs.getDouble("x"), rs.getDouble("y"), rs.getDouble("z"))
+                val boost = try { rs.getDouble("boost") } catch (e: Exception) { 0.0 }
+                val index = try { rs.getInt("player_shop_index") } catch (e: Exception) { 1 }
+                return ShopData(
+                    rs.getInt("id"),
+                    UUID.fromString(rs.getString("owner_uuid")),
+                    rs.getString("owner_name"),
+                    loc,
+                    rs.getString("name"),
+                    rs.getString("description"),
+                    index,
+                    boost,
+                    0.0
                 )
             }
         }
@@ -409,6 +470,24 @@ class StorageImpl(private val plugin: EchoMarket) : Storage {
         }
     }
 
+    override fun getBoardMessage(id: Int): BoardData? {
+        dataSource.connection.use { conn ->
+            val ps = conn.prepareStatement("SELECT * FROM boards WHERE id = ?")
+            ps.setInt(1, id)
+            val rs = ps.executeQuery()
+            if (rs.next()) {
+                return BoardData(
+                    rs.getInt("id"),
+                    UUID.fromString(rs.getString("owner_uuid")),
+                    rs.getString("owner_name"),
+                    rs.getString("content"),
+                    rs.getLong("expire_at")
+                )
+            }
+        }
+        return null
+    }
+
     override fun getBoardMessages(): List<BoardData> {
         val list = mutableListOf<BoardData>()
         dataSource.connection.use { conn ->
@@ -429,12 +508,44 @@ class StorageImpl(private val plugin: EchoMarket) : Storage {
         return list
     }
 
+    override fun getBoardMessages(owner: UUID): List<BoardData> {
+        val list = mutableListOf<BoardData>()
+        dataSource.connection.use { conn ->
+            val ps = conn.prepareStatement("SELECT * FROM boards WHERE owner_uuid = ? ORDER BY created_at DESC")
+            ps.setString(1, owner.toString())
+            val rs = ps.executeQuery()
+            while (rs.next()) {
+                list.add(BoardData(
+                    rs.getInt("id"),
+                    UUID.fromString(rs.getString("owner_uuid")),
+                    rs.getString("owner_name"),
+                    rs.getString("content"),
+                    rs.getLong("expire_at")
+                ))
+            }
+        }
+        return list
+    }
+
     override fun renewBoardMessage(id: Int, duration: Long) {
         dataSource.connection.use { conn ->
             val ps = conn.prepareStatement("UPDATE boards SET expire_at = expire_at + ? WHERE id = ?")
             ps.setLong(1, duration * 1000)
             ps.setInt(2, id)
             ps.executeUpdate()
+        }
+    }
+
+    override fun deleteBoardMessage(id: Int): Boolean {
+        return try {
+            dataSource.connection.use { conn ->
+                val ps = conn.prepareStatement("DELETE FROM boards WHERE id = ?")
+                ps.setInt(1, id)
+                ps.executeUpdate() > 0
+            }
+        } catch (e: SQLException) {
+            e.printStackTrace()
+            false
         }
     }
 
@@ -505,6 +616,37 @@ class StorageImpl(private val plugin: EchoMarket) : Storage {
         return TransactionStats(totalVolume, transactionCount)
     }
 
+    override fun addNotification(player: UUID, message: String) {
+        dataSource.connection.use { conn ->
+            val ps = conn.prepareStatement("INSERT INTO notifications (player_uuid, message, created_at) VALUES (?, ?, ?)")
+            ps.setString(1, player.toString())
+            ps.setString(2, message)
+            ps.setLong(3, System.currentTimeMillis())
+            ps.executeUpdate()
+        }
+    }
+
+    override fun getNotifications(player: UUID): List<String> {
+        val list = mutableListOf<String>()
+        dataSource.connection.use { conn ->
+            val ps = conn.prepareStatement("SELECT message FROM notifications WHERE player_uuid = ? ORDER BY created_at ASC")
+            ps.setString(1, player.toString())
+            val rs = ps.executeQuery()
+            while (rs.next()) {
+                list.add(rs.getString("message"))
+            }
+        }
+        return list
+    }
+
+    override fun deleteNotifications(player: UUID) {
+        dataSource.connection.use { conn ->
+            val ps = conn.prepareStatement("DELETE FROM notifications WHERE player_uuid = ?")
+            ps.setString(1, player.toString())
+            ps.executeUpdate()
+        }
+    }
+
     override fun getShopCount(player: UUID): Int {
         var count = 0
         dataSource.connection.use { conn ->
@@ -516,6 +658,19 @@ class StorageImpl(private val plugin: EchoMarket) : Storage {
             }
         }
         return count
+    }
+
+    override fun logAdminAction(adminUuid: UUID, adminName: String, action: String, target: String, details: String) {
+        dataSource.connection.use { conn ->
+            val ps = conn.prepareStatement("INSERT INTO admin_logs (admin_uuid, admin_name, action, target, details, timestamp) VALUES (?, ?, ?, ?, ?, ?)")
+            ps.setString(1, adminUuid.toString())
+            ps.setString(2, adminName)
+            ps.setString(3, action)
+            ps.setString(4, target)
+            ps.setString(5, details)
+            ps.setLong(6, System.currentTimeMillis())
+            ps.executeUpdate()
+        }
     }
 }
 

@@ -10,6 +10,7 @@ depend:
   - FancyNpcs
 softdepend:
   - PlaceholderAPI
+  - WorldGuard
 commands:
   market:
     description: 市场主命令
