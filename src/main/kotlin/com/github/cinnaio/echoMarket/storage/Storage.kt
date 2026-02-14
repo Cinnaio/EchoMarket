@@ -22,6 +22,7 @@ interface Storage {
     fun getAllShops(): List<ShopData>
     fun updateShopName(shopId: Int, name: String)
     fun updateShopDesc(shopId: Int, desc: String)
+    fun updateShopLocation(shopId: Int, location: Location): Boolean
     fun removeShop(shopId: Int): Boolean
     
     // Items
@@ -231,6 +232,19 @@ class StorageImpl(private val plugin: EchoMarket) : Storage {
     override fun createShop(owner: UUID, ownerName: String, location: Location, name: String, desc: String): Boolean {
         return try {
             dataSource.connection.use { conn ->
+                var nextId = 1
+                run {
+                    val rsIds = conn.createStatement().executeQuery("SELECT id FROM shops ORDER BY id ASC")
+                    var expect = 1
+                    while (rsIds.next()) {
+                        val current = rsIds.getInt("id")
+                        if (current != expect) {
+                            break
+                        }
+                        expect += 1
+                    }
+                    nextId = expect
+                }
                 // Calculate next index
                 var nextIndex = 1
                 val psCount = conn.prepareStatement("SELECT MAX(player_shop_index) as max_idx FROM shops WHERE owner_uuid = ?")
@@ -240,17 +254,18 @@ class StorageImpl(private val plugin: EchoMarket) : Storage {
                     nextIndex = rs.getInt("max_idx") + 1
                 }
                 
-                val ps = conn.prepareStatement("INSERT INTO shops (owner_uuid, owner_name, world, x, y, z, name, description, created_at, player_shop_index) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-                ps.setString(1, owner.toString())
-                ps.setString(2, ownerName)
-                ps.setString(3, location.world.name)
-                ps.setDouble(4, location.x)
-                ps.setDouble(5, location.y)
-                ps.setDouble(6, location.z)
-                ps.setString(7, name)
-                ps.setString(8, desc)
-                ps.setLong(9, System.currentTimeMillis())
-                ps.setInt(10, nextIndex)
+                val ps = conn.prepareStatement("INSERT INTO shops (id, owner_uuid, owner_name, world, x, y, z, name, description, created_at, player_shop_index) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                ps.setInt(1, nextId)
+                ps.setString(2, owner.toString())
+                ps.setString(3, ownerName)
+                ps.setString(4, location.world.name)
+                ps.setDouble(5, location.x)
+                ps.setDouble(6, location.y)
+                ps.setDouble(7, location.z)
+                ps.setString(8, name)
+                ps.setString(9, desc)
+                ps.setLong(10, System.currentTimeMillis())
+                ps.setInt(11, nextIndex)
                 ps.executeUpdate() > 0
             }
         } catch (e: SQLException) {
@@ -404,6 +419,23 @@ class StorageImpl(private val plugin: EchoMarket) : Storage {
             ps.setString(1, desc)
             ps.setInt(2, shopId)
             ps.executeUpdate()
+        }
+    }
+
+    override fun updateShopLocation(shopId: Int, location: Location): Boolean {
+        return try {
+            dataSource.connection.use { conn ->
+                val ps = conn.prepareStatement("UPDATE shops SET world = ?, x = ?, y = ?, z = ? WHERE id = ?")
+                ps.setString(1, location.world?.name)
+                ps.setDouble(2, location.x)
+                ps.setDouble(3, location.y)
+                ps.setDouble(4, location.z)
+                ps.setInt(5, shopId)
+                ps.executeUpdate() > 0
+            }
+        } catch (e: SQLException) {
+            e.printStackTrace()
+            false
         }
     }
 

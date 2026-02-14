@@ -83,7 +83,11 @@ class EchoMarket : JavaPlugin() {
         server.pluginManager.registerEvents(PlayerListener(this), this)
         
         // Commands
-        getCommand("market")?.setExecutor(MarketCommand(this))
+        run {
+            val marketCmd = MarketCommand(this)
+            getCommand("market")?.setExecutor(marketCmd)
+            getCommand("market")?.setTabCompleter(marketCmd)
+        }
         
         // Utils
         MessageUtil.prefix = configManager.getMessage("prefix")

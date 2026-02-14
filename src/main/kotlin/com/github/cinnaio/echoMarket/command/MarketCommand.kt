@@ -159,6 +159,15 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
                 val desc = args.drop(nameStartIndex).joinToString(" ")
                 plugin.marketManager.updateDesc(sender, desc, targetIndex)
             }
+            "movehere" -> {
+                if (sender !is Player) {
+                    MessageUtil.send(sender, "<general.not-player>")
+                    return true
+                }
+                
+                val targetIndex = if (args.size > 1) args[1].toIntOrNull() else null
+                plugin.marketManager.moveShop(sender, targetIndex)
+            }
             "skin" -> {
                 if (sender !is Player) {
                     MessageUtil.send(sender, "<general.not-player>")
@@ -639,7 +648,7 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
         if (sender !is Player) return emptyList()
 
         if (args.size == 1) {
-            val subCommands = mutableListOf("create", "list", "remove", "name", "desc", "sell", "skin", "help", "reload")
+            val subCommands = mutableListOf("create", "list", "remove", "name", "desc", "sell", "skin", "movehere", "help", "reload")
             if (sender.hasPermission("market.admin")) {
                 subCommands.add("admin")
             }
@@ -662,6 +671,9 @@ class MarketCommand(private val plugin: EchoMarket) : CommandExecutor, TabComple
                  "sell" -> {
                      return listOf("<价格>") // 提示用
                  }
+                "movehere" -> {
+                    return plugin.storage.getShops(sender.uniqueId).map { it.index.toString() }.filter { it.startsWith(args[1], ignoreCase = true) }
+                }
              }
         }
 
